@@ -18,6 +18,23 @@ export const ui = [
     ],
   },
   {
+    name: 'serial-terminal',
+    type: 'registry:ui',
+    title: 'Serial Terminal',
+    description: 'A terminal-like component for serial input and output with a configurable maximum number of entries, automatically removing the oldest when the limit is exceeded.',
+    dependencies: ['@lucide/vue'],
+    files: [
+      {
+        path: 'ui/serial-terminal/index.ts',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/SerialTerminal.vue',
+        type: 'registry:ui',
+      },
+    ],
+  },
+  {
     name: 'auto-form',
     type: 'registry:ui',
     title: 'Auto Form',
