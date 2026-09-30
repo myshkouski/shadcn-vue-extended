@@ -5,6 +5,7 @@ import prettyBytes from 'pretty-bytes'
 // import { getRandomValues } from "uncrypto"
 import type { SerialTerminalTarget } from '~~/registry/ui/serial-terminal'
 import { Checkbox } from '@/components/ui/checkbox'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { CopyIcon, LinkIcon, TrashIcon } from '@lucide/vue'
 import { useClipboard, watchImmediate } from '@vueuse/core'
@@ -60,17 +61,25 @@ class EchoTerminal implements SerialTerminalTarget {
 //   readonly writable = null
 // }
 
+type TerminalTargetOption = 'echo' | 'random-generator' | 'serial'
+const terminalTargetOption = shallowRef<TerminalTargetOption>('echo')
+
 const echoTerminalTarget = new EchoTerminal()
 // const randomGenerator = new RandomGenerator()
-
-const enableEchoTerminal = ref(true)
 
 const textEncoder = new TextEncoder()
 const textDecoder = new TextDecoder()
 
 const serialTerminalTarget = computed<SerialTerminalTarget | null | undefined>(() => {
-  return enableEchoTerminal.value ? echoTerminalTarget : port.value
-  // return randomGenerator
+  switch (terminalTargetOption.value) {
+    case 'echo':
+      return echoTerminalTarget
+    case 'serial':
+      return port.value
+    case 'random-generator':
+      // not implemented
+      return null
+  } 
 })
 
 const truncated = shallowRef<number | bigint>(0n)
@@ -154,20 +163,58 @@ function copyAll() {
 }
 
 const buttons = computed(() => [
-  { label: 'Connect', icon: LinkIcon, action: toggleConnection, disabled: enableEchoTerminal.value },
+  { label: 'Connect', icon: LinkIcon, action: toggleConnection, disabled: 'serial' !== terminalTargetOption.value },
   { label: 'Copy', icon: CopyIcon, action: copyAll, disabled: !isCopySupported.value },
   { label: 'Clear', icon: TrashIcon, action: clearOutput },
 ])
+
+type TargetOptions = {
+  name: TerminalTargetOption;
+  title: string
+  description: string
+  disabled?: boolean
+}
+
+const targetOptions: readonly TargetOptions[] = [
+  {
+    name: 'echo',
+    title: 'Echo Terminal',
+    description: 'Use virtual emulated device for echoing terminal input.',
+  },
+  {
+    name: 'random-generator',
+    title: 'Random Generator',
+    description: 'Generates infinite random bytes. Not implemented yet.',
+    disabled: true,
+  },
+  {
+    name: 'serial',
+    title: 'Echo Terminal',
+    description: 'Connect to a real serial port device using <a class="underline" target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API">WebSerial API</a>.',
+  },
+]
+
 </script>
 
 <template>
-  <div class="w-full max-w-xl space-y-4">
-    <div class="flex items-start gap-2 mx-2">
-      <Checkbox id="echo-mode" v-model="enableEchoTerminal" />
-      <Label for="echo-mode" class="flex-col items-start gap-0">
-        <span class="text-foreground">Echo Terminal</span>
-        <span class="text-sm">Use virtual emulated device for echoing terminal input.</span>
-      </Label>
+  <div class="w-full max-w-xl space-y-8">
+    <div class="space-y-2">
+      <p>Select terminal device:</p>
+      <RadioGroup v-model="terminalTargetOption">
+        <div
+          v-for="{ name, title, description, disabled } in targetOptions" 
+          class="flex items-start space-x-2"
+        >
+          <RadioGroupItem :disabled="disabled" id="r1" :value="name" />
+          <Label for="echo" :class="[
+            'flex-col items-start gap-0',
+            { 'opacity-50': disabled },
+          ]">
+            <span class="text-foreground">{{ title }}</span>
+            <span class="text-sm" v-html="description"></span>
+          </Label>
+        </div>
+      </RadioGroup>
     </div>
     <div class="h-96 overflow-hidden">
       <SerialTerminal
