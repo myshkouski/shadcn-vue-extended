@@ -21,14 +21,12 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
 
   const onTruncate = options?.onTruncate
 
-  if (onTruncate) {
-    watchEffect(() => {
-      if (entries.value.length > maxEntries.value) {
-        const truncatedEntries = entries.value.splice(0, entries.value.length - maxEntries.value)
-        onTruncate(truncatedEntries)
-      }
-    })
-  }
+  watchEffect(() => {
+    if (entries.value.length > maxEntries.value) {
+      const truncatedEntries = entries.value.splice(0, entries.value.length - maxEntries.value)
+      onTruncate?.(truncatedEntries)
+    }
+  })
 
   return {
     entries: readonly(entries),

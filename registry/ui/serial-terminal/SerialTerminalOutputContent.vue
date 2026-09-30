@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { useElementVisibility } from '@vueuse/core'
 import { injectScrollAreaRootContext } from 'reka-ui'
-import { computed, useTemplateRef } from 'vue'
+import { computed, useTemplateRef, type HTMLAttributes } from 'vue'
+import type { TerminalLineEntry } from './useTerminalOutput'
 
-// export interface ContentProps {
-//   entries?: readonly TerminalLineEntry[]
-//   class?: HTMLAttributes['class']
-// }
+export interface ContentProps {
+  entries?: readonly TerminalLineEntry[]
+  class?: HTMLAttributes['class']
+}
 
-// const props = defineProps<ContentProps>()
+const props = defineProps<ContentProps>()
 const scrollContext = injectScrollAreaRootContext()
 const visibilityElement = useTemplateRef('visibilityElement')
 const viewportElement = computed(() => {
@@ -29,10 +30,22 @@ function scrollToBottom() {
   })
 }
 
-defineExpose({ scrollToBottom })
+watch(() => props.entries, () => {
+  scrollToBottom()
+}, {
+  flush: 'post',
+  deep: 2,
+})
+
 </script>
 
 <template>
-  <slot />
+  <template
+    v-for="entry in entries"
+    :key="entry.id"
+  >
+    <slot :entry />
+  </template>
+
   <div ref="visibilityElement" class="relative bottom-0" />
 </template>

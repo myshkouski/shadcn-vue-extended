@@ -1,21 +1,31 @@
 <script setup lang="ts">
 /// <reference types="@types/w3c-web-serial" />
 
+import prettyBytes from 'pretty-bytes'
+// import { getRandomValues } from "uncrypto"
 import type { SerialTerminalTarget } from '~~/registry/ui/serial-terminal'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { CopyIcon, LinkIcon, TrashIcon } from '@lucide/vue'
 import { useClipboard, watchImmediate } from '@vueuse/core'
-import { ref, shallowRef, useTemplateRef } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { useSerial } from 'vue-extras'
 import { toast } from 'vue-sonner'
-import { SerialTerminal, SerialTerminalHeader, useSerialTerminal } from '~~/registry/ui/serial-terminal'
+import {
+  SerialTerminal, 
+  SerialTerminalHeader, 
+  SerialTerminalOutput,
+  SerialTerminalOutputLine,
+  SerialTerminalOutputContent,
+  SerialTerminalInput,
+  useSerialTerminal,
+  useTerminalOutput,
+} from '~~/registry/ui/serial-terminal'
 import { Button } from '@/components/ui/button'
 
 const serial = useSerial()
 
 const input = ref('')
-const serialTerminalRef = useTemplateRef('serialTerminal')
 
 const port = shallowRef<SerialPort>()
 
@@ -35,7 +45,23 @@ class EchoTerminal implements SerialTerminalTarget {
   })
 }
 
+// class RandomGenerator implements SerialTerminalTarget {
+//   readonly readable = new ReadableStream<Uint8Array>({
+//     pull(controller) {
+//       const chunkSize = controller.desiredSize
+//       console.warn("[pull]", "chunkSize:", chunkSize)
+//       if (chunkSize) {
+//         const chunk = getRandomValues(new Uint8Array(chunkSize))
+//         controller.enqueue(chunk)
+//       }
+//     },
+//   })
+
+//   readonly writable = null
+// }
+
 const echoTerminalTarget = new EchoTerminal()
+// const randomGenerator = new RandomGenerator()
 
 const enableEchoTerminal = ref(true)
 
@@ -44,12 +70,32 @@ const textDecoder = new TextDecoder()
 
 const serialTerminalTarget = computed<SerialTerminalTarget | null | undefined>(() => {
   return enableEchoTerminal.value ? echoTerminalTarget : port.value
+  // return randomGenerator
 })
 
-const { write, errors, isPending: isTerminalActive } = useSerialTerminal(serialTerminalTarget, {
+const truncated = shallowRef<number | bigint>(0n)
+const { entries, append: appendOutput, clear: clearOutput } = useTerminalOutput({
+  maxEntries: 100,
+  onTruncate(entries) {
+    for (const entry of entries) {
+      if (typeof truncated.value === 'bigint') {
+        truncated.value += BigInt(entry.content.length)
+      }
+      else {
+        truncated.value += entry.content.length
+      }
+    }
+  },
+})
+
+const {
+  write,
+  errors,
+  isPending: isTerminalActive,
+} = useSerialTerminal(serialTerminalTarget, {
   onRead(data) {
     const message = textDecoder.decode(data)
-    serialTerminalRef.value?.write(message, 'input')
+    appendOutput(message, 'input')
   },
 })
 
@@ -69,13 +115,8 @@ watchImmediate(errors, (errors) => {
   })
 })
 
-async function handleSend(payload: { content: string }) {
-  const terminal = serialTerminalRef.value
-  if (!terminal) {
-    return
-  }
-
-  await write(textEncoder.encode(payload.content))
+async function handleSend(content: string) {
+  await write(textEncoder.encode(content))
 }
 
 async function toggleConnection() {
@@ -101,16 +142,14 @@ async function toggleConnection() {
   }
 }
 
-function clearOutput() {
-  serialTerminalRef.value?.clear()
-}
-
 const { copy, isSupported: isCopySupported } = useClipboard()
 
 function copyAll() {
-  if (isCopySupported.value && serialTerminalRef.value) {
-    // const content = serialTerminalRef.value
-    copy('').catch(console.error)
+  if (isCopySupported.value) {
+    const content = entries.value.reduce((content, entry) => {
+      return content + entry.content
+    }, "")
+    copy(content).catch(console.error)
   }
 }
 
@@ -132,11 +171,8 @@ const buttons = computed(() => [
     </div>
     <div class="h-96 overflow-hidden">
       <SerialTerminal
-        ref="serialTerminal"
         v-model:input="input"
         class="size-full"
-        :max-entries="20"
-        @send="handleSend"
       >
         <SerialTerminalHeader>
           <Button
@@ -151,6 +187,28 @@ const buttons = computed(() => [
             <component :is="item.icon" class="size-3" />
           </Button>
         </SerialTerminalHeader>
+
+        <SerialTerminalOutput class="flex-1">
+          <p
+            v-if="truncated > 0"
+            class="text-muted-foreground text-xs mb-2 italic"
+          >
+            {{ prettyBytes(truncated, { space: false }) }} truncated
+          </p>
+
+          <p v-if="!entries?.length" class="text-muted-foreground text-xs italic select-none">
+            No output yet. Type a command and press Enter.
+          </p>
+
+          <SerialTerminalOutputContent :entries v-slot="{ entry }">
+            <SerialTerminalOutputLine :entry />
+          </SerialTerminalOutputContent>
+        </SerialTerminalOutput>
+
+        <SerialTerminalInput
+          class="flex-0" 
+          @send="handleSend"
+        />
       </SerialTerminal>
     </div>
   </div>
