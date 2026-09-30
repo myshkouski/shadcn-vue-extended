@@ -1,48 +1,51 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
-import { default as SerialTerminalInput } from './SerialTerminalInput.vue'
-import { default as SerialTerminalOutput } from './SerialTerminalOutput.vue'
-import { useTerminalOutput, type TerminalLineEntryType } from './useTerminalOutput.ts';
-import { default as SerialTerminalOutputLine } from "./SerialTerminalOutputLine.vue"
-import { default as prettyBytes } from "pretty-bytes"
+import prettyBytes from 'pretty-bytes'
+import SerialTerminalInput from './SerialTerminalInput.vue'
+import SerialTerminalOutput from './SerialTerminalOutput.vue'
+import SerialTerminalOutputLine from './SerialTerminalOutputLine.vue'
+import { useTerminalOutput } from './useTerminalOutput.ts'
 
-const props = withDefaults(defineProps<{
+export interface SerialTerminalProps {
   class?: HTMLAttributes['class']
   maxEntries?: number
   modelValue?: string
   placeholder?: string
   disabled?: boolean
   autofocus?: boolean
-}>(), {
+}
+
+export interface SerialTerminalEmits {
+  (e: 'send', payload: { content: string }): void
+  (e: 'clear'): void
+}
+
+const props = withDefaults(defineProps<SerialTerminalProps>(), {
   maxEntries: Number.POSITIVE_INFINITY,
   placeholder: '',
   disabled: false,
   autofocus: false,
 })
 
-const emit = defineEmits<{
-  (e: 'send', payload: { content: string }): void
-  (e: 'clear'): void
-}>()
+const emit = defineEmits<SerialTerminalEmits>()
 
-const truncated = ref(0)
+const truncated = shallowRef<number | bigint>(0n)
 const { entries, append, clear: clearOutput } = useTerminalOutput({
   maxEntries: () => props.maxEntries,
   onTruncate(entries) {
     for (const entry of entries) {
-      truncated.value += entry.content.length
+      if (typeof truncated.value === 'bigint') {
+        truncated.value += BigInt(entry.content.length)
+      }
+      else {
+        truncated.value += entry.content.length
+      }
     }
-  }
+  },
 })
 
-const inputValue = defineModel('input', { default: '' })
 const output = useTemplateRef('output')
-
-function write(content: string, type: TerminalLineEntryType) {
-  const lines = content.split(/\r?\n/)
-  append(lines, type)
-}
 
 function clear(): void {
   clearOutput()
@@ -58,24 +61,22 @@ function handleSend(content: string): void {
     return
   }
 
-  write(content, 'input')
-  inputValue.value = ''
+  append(content, 'input')
 
   emit('send', { content })
 }
 
 defineExpose({
-  write,
+  write: append,
   clear,
 })
 
 watch(entries, () => {
   scrollToBottom()
 }, {
-  flush: "post",
+  flush: 'post',
   deep: 2,
 })
-
 </script>
 
 <template>
@@ -92,9 +93,11 @@ watch(entries, () => {
       ref="output"
     >
       <p
-        v-if="truncated > 0" 
+        v-if="truncated > 0"
         class="text-muted-foreground text-xs mb-2 italic"
-      >{{ prettyBytes(truncated, { space: false }) }} truncated</p>
+      >
+        {{ prettyBytes(truncated, { space: false }) }} truncated
+      </p>
 
       <p v-if="!entries?.length" class="text-muted-foreground text-xs italic select-none">
         No output yet. Type a command and press Enter.
@@ -102,8 +105,8 @@ watch(entries, () => {
 
       <template v-else>
         <SerialTerminalOutputLine
-          v-for="entry in entries" 
-          :key="entry.id" 
+          v-for="entry in entries"
+          :key="entry.id"
           :entry="entry"
         />
       </template>

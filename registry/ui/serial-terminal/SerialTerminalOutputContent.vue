@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from "vue"
-import { useElementVisibility } from "@vueuse/core"
-import { injectScrollAreaRootContext } from "reka-ui"
-import type { TerminalLineEntry } from "./useTerminalOutput"
+import { useElementVisibility } from '@vueuse/core'
+import { injectScrollAreaRootContext } from 'reka-ui'
 
-export interface ContentProps {
-  entries?: readonly TerminalLineEntry[]
-  class?: HTMLAttributes["class"]
-}
+// export interface ContentProps {
+//   entries?: readonly TerminalLineEntry[]
+//   class?: HTMLAttributes['class']
+// }
 
-const props = defineProps<ContentProps>()
+// const props = defineProps<ContentProps>()
 const scrollContext = injectScrollAreaRootContext()
-const visibilityElement = useTemplateRef("visibilityElement")
+const visibilityElement = useTemplateRef('visibilityElement')
 const viewportElement = computed(() => {
   return scrollContext.viewport.value
 })
@@ -22,18 +20,18 @@ const isVisibilityElementVisible = useElementVisibility(visibilityElement, {
 })
 
 function scrollToBottom() {
-  if (!isVisibilityElementVisible.value) return
+  if (!isVisibilityElementVisible.value)
+    return
 
   viewportElement.value?.scrollTo({
-    top: Number.MAX_SAFE_INTEGER
+    top: Number.MAX_SAFE_INTEGER,
   })
 }
 
 defineExpose({ scrollToBottom })
-
 </script>
 
 <template>
   <slot />
-  <div ref="visibilityElement" class="relative bottom-0"></div>
+  <div ref="visibilityElement" class="relative bottom-0" />
 </template>

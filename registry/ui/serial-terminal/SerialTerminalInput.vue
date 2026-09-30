@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue';
-import { cn } from '~/lib/utils';
-import { ArrowRightIcon } from "@lucide/vue" 
+import type { HTMLAttributes } from 'vue'
+import { ArrowRightIcon } from '@lucide/vue'
+import { cn } from '~/lib/utils'
+import type { SerialTerminalNewLineToggleModelValue } from './SerialTerminalNewLineToggle.vue'
+import SerialTerminalNewLineToggle from './SerialTerminalNewLineToggle.vue'
 
 export interface SerialTerminalInputProps {
-  class?: HTMLAttributes["class"];
+  class?: HTMLAttributes['class'];
   disabled?: boolean;
   placeholder?: string;
   autofocus?: boolean;
@@ -17,49 +19,66 @@ export interface SerialTerminalInputEmits {
 const props = defineProps<SerialTerminalInputProps>()
 const emit = defineEmits<SerialTerminalInputEmits>()
 
-const input = ref('')
+const input = shallowRef('')
+const inputHistory = ref<string[]>([])
+const inputHistoryIndex = shallowRef(-1)
+
+const newLine = ref<SerialTerminalNewLineToggleModelValue>('')
 
 function handleSend() {
   let value = input.value
+  inputHistory.value.unshift(input.value)
+  inputHistoryIndex.value = -1
+  input.value = ''
+
   if (newLine.value) {
     value += newLine.value
   }
+
   emit('send', value)
-  input.value = ''
 }
 
 function onKeyDown(e: KeyboardEvent) {
   const key = e.key.toLowerCase()
-  if (key === 'enter') {
-    e.preventDefault()
-    handleSend()
-  }
 
-  if (key === 'backspace' && e.ctrlKey && !props.disabled) {
-    e.preventDefault()
-    input.value = ''
+  switch (key) {
+    case 'arrowup':
+      inputHistoryIndex.value = Math.max(0, inputHistoryIndex.value + 1) % inputHistory.value.length
+      input.value = inputHistory.value.at(inputHistoryIndex.value) || ''
+      break
+
+    case 'arrowdown':
+      inputHistoryIndex.value = Math.max(0, inputHistoryIndex.value - 1) % inputHistory.value.length
+      input.value = inputHistory.value.at(inputHistoryIndex.value) || ''
+      break
+
+    case 'enter':
+      if (e.shiftKey && !props.disabled) {
+        e.preventDefault()
+        handleSend()
+      }
+      break
+
+    case 'backspace':
+      if (e.ctrlKey && !props.disabled) {
+        e.preventDefault()
+        input.value = ''
+      }
+      break
   }
 }
 
-const inputRef = useTemplateRef("inputRef")
+const inputRef = useTemplateRef('inputRef')
 
 function focus() {
   inputRef.value?.focus()
 }
 
 defineExpose({ focus })
-
-const newLineOptions = ['', '\n', '\r\n'] as const
-const newLine = ref<typeof newLineOptions[number]>(newLineOptions[0])
-function switchNewLine() {
-  const index = newLineOptions.indexOf(newLine.value)
-  newLine.value = newLineOptions[(index + 1) % newLineOptions.length]!
-}
-
 </script>
 
 <template>
-  <div 
+  <div
     :class="cn(
       'flex items-center gap-2 border-t bg-sub px-4 py-3',
       props.class,
@@ -77,21 +96,15 @@ function switchNewLine() {
       @input="(e) => { input = (e.target as HTMLInputElement).value }"
       @keydown="onKeyDown"
     >
+
+    <slot>
+      <SerialTerminalNewLineToggle
+        v-model="newLine"
+      />
+    </slot>
+    
     <button
-      :class="[
-        'shrink-0 rounded p-1 hover:bg-accent focus-visible:bg-accent disabled:opacity-50',
-        
-      ]"
-      title="Newline"
-      @click="switchNewLine"
-    >
-      <!-- <TextWrapIcon class="size-3.5" /> -->
-      
-      <span v-for="(char, index) in ['CR', 'LF']" 
-        :class="['font-mono text-xs', { 'text-primary': newLineOptions.indexOf(newLine) > index }]">{{ char }}</span>
-    </button>
-    <button
-      class="shrink-0 rounded p-1 hover:bg-accent focus-visible:bg-accent disabled:opacity-50"
+      class="rounded p-1 hover:bg-accent focus-visible:bg-accent disabled:opacity-50"
       :disabled="props.disabled || !input.trim()"
       title="Send"
       @click="handleSend"
@@ -99,5 +112,4 @@ function switchNewLine() {
       <ArrowRightIcon class="size-3.5" />
     </button>
   </div>
-
 </template>

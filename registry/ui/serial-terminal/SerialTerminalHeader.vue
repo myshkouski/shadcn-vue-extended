@@ -1,6 +1,5 @@
 <script setup lang="ts">
-
-import { TerminalIcon } from "@lucide/vue"
+import { TerminalIcon } from '@lucide/vue'
 
 export interface SerialTerminalHeaderProps {
   title?: string
@@ -8,14 +7,12 @@ export interface SerialTerminalHeaderProps {
 
 const props = defineProps<SerialTerminalHeaderProps>()
 
-const emit = defineEmits<{
-  (type: 'clear'): void
-}>()
-
+// const emit = defineEmits<{
+//   (type: 'clear'): void
+// }>()
 </script>
 
 <template>
-
   <div class="flex items-center justify-between gap-2 border-b bg-sub px-4 py-2 select-none">
     <div class="flex items-center gap-2">
       <TerminalIcon class="size-3.5" />
@@ -25,5 +22,4 @@ const emit = defineEmits<{
       <slot />
     </div>
   </div>
-
 </template>

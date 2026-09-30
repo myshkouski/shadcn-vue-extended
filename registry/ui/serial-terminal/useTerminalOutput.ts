@@ -1,10 +1,16 @@
-export interface UseTerminalOptions {
+export interface UseTerminalOutputOptions {
   initialEntries?: MaybeRefOrGetter<Iterable<TerminalLineEntry>>;
   maxEntries?: MaybeRefOrGetter<number>;
   onTruncate?: (entries: Iterable<TerminalLineEntry>) => void;
 }
 
-export function useTerminalOutput(options?: UseTerminalOptions) {
+export interface UseTerminalOutputReturn {
+  entries: Readonly<Ref<readonly TerminalLineEntry[]>>;
+  append(content: string, type: TerminalLineEntryType): void;
+  clear(): void
+}
+
+export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTerminalOutputReturn {
   const initialEntriesValue = toValue(options?.initialEntries)
   const entries = ref<TerminalLineEntry[]>(initialEntriesValue ? [...initialEntriesValue] : [])
 
@@ -19,18 +25,18 @@ export function useTerminalOutput(options?: UseTerminalOptions) {
         onTruncate(truncatedEntries)
       }
     })
-}
+  }
 
   return {
     entries: readonly(entries),
     append: append.bind(globalThis, entries),
-    clear: () => { entries.value = [] }
+    clear: () => { entries.value = [] },
   }
 }
 
 function createTimestampId(exponent: number = 0) {
   const now = Date.now()
-  const div = Math.pow(10, exponent)
+  const div = 10 ** exponent
   const timestamp = div > 1
     ? Math.floor(now / div) * div
     : now
@@ -47,13 +53,16 @@ function createId(): string {
 
 function append(
   entries: Ref<TerminalLineEntry[]>,
-  lines: readonly string[], 
+  content: string,
   type: TerminalLineEntryType,
 ) {
-  if (!lines.length) return
+  const lines = content.split(/\r?\n/)
+
+  if (!lines.length)
+    return
 
   let linesIndex = 0
-  let entriesIndex = Math.max(0, entries.value.length - 1)
+  const entriesIndex = Math.max(0, entries.value.length - 1)
 
   if (entries.value.length > 0) {
     const lastLine = entries.value[entriesIndex]!
@@ -87,6 +96,6 @@ class DefaultTerminalLineEntry implements TerminalLineEntry {
 
   constructor(
     readonly type: TerminalLineEntryType,
-    readonly content: string
+    readonly content: string,
   ) {}
 }

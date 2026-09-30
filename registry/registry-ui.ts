@@ -22,7 +22,8 @@ export const ui = [
     type: 'registry:ui',
     title: 'Serial Terminal',
     description: 'A terminal-like component for serial input and output with a configurable maximum number of entries, automatically removing the oldest when the limit is exceeded.',
-    dependencies: ['@lucide/vue'],
+    // useSerialTerminal.ts imports notNullish/tryOnScopeDispose from @vueuse/core.
+    dependencies: ['@lucide/vue', '@vueuse/core'],
     files: [
       {
         path: 'ui/serial-terminal/index.ts',
@@ -30,6 +31,46 @@ export const ui = [
       },
       {
         path: 'ui/serial-terminal/SerialTerminal.vue',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/SerialTerminalHeader.vue',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/SerialTerminalInput.vue',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/SerialTerminalOutput.vue',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/SerialTerminalOutputLine.vue',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/SerialTerminalOutputContent.vue',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/SerialTerminalNewLineToggle.vue',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/useTerminalWriter.ts',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/useTerminalReader.ts',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/useTerminalOutput.ts',
+        type: 'registry:ui',
+      },
+      {
+        path: 'ui/serial-terminal/useSerialTerminal.ts',
         type: 'registry:ui',
       },
     ],

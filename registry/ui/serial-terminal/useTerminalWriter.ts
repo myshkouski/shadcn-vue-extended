@@ -1,38 +1,61 @@
-import { watchImmediate } from "@vueuse/core"
+import { tryOnScopeDispose, watchImmediate, type Stoppable } from '@vueuse/core'
 
-export interface UseTerminalWriterOptions {}
+export interface UseTerminalWriterOptions { }
+export interface UseTerminalWriterReturn<T> extends Stoppable {
+  write(chunk: T): Promise<void>;
+  error: Readonly<Ref<Error | null | undefined>>;
+}
 
 export function useTerminalWriter<T>(
-  writable: MaybeRefOrGetter<WritableStream<T> | null | undefined>
-) {
+  writable: MaybeRefOrGetter<WritableStream<T> | null | undefined>,
+): UseTerminalWriterReturn<T> {
   const writer = shallowRef<WritableStreamDefaultWriter<T>>()
-  const error = shallowRef<Error | null>(null)
-
-  watchImmediate(() => toValue(writable), writable => {
-    writer.value = writable?.getWriter()
+  const error = shallowRef<Error>()
+  const isPending = computed(() => {
+    return !!writer.value
   })
 
-  watchImmediate(writer, (writer, oldWriter) => {
+  async function write(chunk: T) {
+    try {
+      await writer.value?.write(chunk)
+    }
+    catch (cause) {
+      const e = cause instanceof Error
+        ? cause
+        : new Error('Unable to write', { cause })
+
+      error.value = e
+
+      throw e
+    }
+  }
+
+  function start() {
+    writer.value = toValue(writable)?.getWriter()
+    error.value = void 0
+  }
+
+  function stop() {
+    writer.value = void 0
+  }
+
+  tryOnScopeDispose(() => {
+    stop()
+  })
+
+  watchImmediate(writer, (_, oldWriter) => {
     oldWriter?.releaseLock()
   })
 
-  return {
-    async close() {
-      await writer.value?.close()
-    },
-    error: readonly(error),
-    async write(chunk: T) {
-      try {
-        await writer.value?.write(chunk)
-      } catch (cause) {
-        const e = cause instanceof Error
-          ? cause
-          : new Error("Unable to write", { cause })
-        
-        error.value = e
+  watchImmediate(() => toValue(writable), () => {
+    start()
+  })
 
-        throw e
-      }
-    },
+  return {
+    isPending,
+    error: readonly(error),
+    stop,
+    start,
+    write,
   }
 }
