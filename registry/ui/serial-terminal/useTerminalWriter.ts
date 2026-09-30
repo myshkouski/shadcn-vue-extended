@@ -19,10 +19,22 @@ export function useTerminalWriter<T>(
   })
 
   async function write(chunk: T) {
+    const current = writer.value
+
+    if (!current)
+      return
+
     try {
-      await writer.value?.write(chunk)
+      await current.write(chunk)
     }
     catch (cause) {
+      // A released writer (target switched mid-write) rejects the pending
+      // write. That is teardown, not a failure of the target, so it neither
+      // lands in `error` nor rejects into the caller. Closing the sink stays
+      // the responsibility of the target itself.
+      if (writer.value !== current)
+        return
+
       const e = cause instanceof Error
         ? cause
         : new Error('Unable to write', { cause })
@@ -34,7 +46,15 @@ export function useTerminalWriter<T>(
   }
 
   function start() {
-    writer.value = toValue(writable)?.getWriter()
+    // The previously attached writer is released by the `writer` watcher below,
+    // so assigning here is all it takes to move over to the next target.
+    try {
+      writer.value = toValue(writable)?.getWriter()
+    }
+    catch (e) {
+      error.value = e as Error
+      throw e
+    }
     error.value = void 0
   }
 

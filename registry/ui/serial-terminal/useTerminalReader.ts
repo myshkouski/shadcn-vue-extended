@@ -22,6 +22,8 @@ export function useTerminalReader<T>(
   })
 
   function start() {
+    // The previously attached reader is released by the `reader` watcher below,
+    // so assigning here is all it takes to move over to the next target.
     try {
       reader.value = toValue(readable)?.getReader()
     }
@@ -37,6 +39,9 @@ export function useTerminalReader<T>(
   })
 
   function stop() {
+    // Detaches the reader only: the lock is released by the watcher below and
+    // the stream stays readable, since tearing it down belongs to whoever
+    // owns it, not to the reader.
     reader.value = void 0
   }
 
@@ -48,16 +53,26 @@ export function useTerminalReader<T>(
     oldReader?.releaseLock()
   })
 
-  watchImmediate(reader, async (reader) => {
+  watchImmediate(reader, async (activeReader) => {
     const onRead = options?.onRead
-    if (reader && onRead) {
-      readLoop(reader, onRead).catch((e) => {
-        if (isPending.value) {
-          error.value = e as Error
-        }
-      }).then(() => {
+
+    if (!activeReader || !onRead)
+      return
+
+    try {
+      await readLoop(activeReader, onRead)
+    }
+    catch (cause) {
+      // Releasing the lock on a stopped or replaced reader rejects the pending
+      // read. That is teardown, not a failure of the target, so it stays out
+      // of `error`.
+      if (reader.value !== activeReader)
+        return
+      error.value = cause as Error
+    }
+    finally {
+      if (reader.value === activeReader)
         stop()
-      })
     }
   })
 
