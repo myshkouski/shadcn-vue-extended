@@ -85,7 +85,7 @@ defineExpose({ focus })
       props.class,
     )"
   >
-    <span class="select-none text-muted-foreground font-mono">$</span>
+    <!-- <span class="select-none text-muted-foreground font-mono">$</span> -->
     <input
       ref="inputRef"
       :value="input"

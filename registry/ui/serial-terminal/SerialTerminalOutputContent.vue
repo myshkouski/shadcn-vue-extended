@@ -5,7 +5,7 @@ import { computed, useTemplateRef, type HTMLAttributes } from 'vue'
 import type { TerminalLineEntry } from './useTerminalOutput'
 
 export interface ContentProps {
-  entries?: readonly TerminalLineEntry[]
+  entries?: Iterable<TerminalLineEntry>
   class?: HTMLAttributes['class']
 }
 
@@ -44,8 +44,12 @@ watch(() => props.entries, () => {
     v-for="entry in entries"
     :key="entry.id"
   >
-    <slot :entry />
+    <div
+      class="px-4 first:mt-4 hover:bg-accent/50"
+    >
+      <slot :entry />
+    </div>
   </template>
 
-  <div ref="visibilityElement" class="relative bottom-0" />
+  <div ref="visibilityElement" class="relative bottom-0 mb-4" />
 </template>

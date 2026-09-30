@@ -14,7 +14,7 @@ const props = defineProps<SerialTerminalOutputProps>()
 <template>
   <ScrollArea
     :class="cn(
-      'flex-1 h-full overflow-hidden p-4',
+      'flex-1 h-full overflow-hidden',
       props.class,
     )"
   >
