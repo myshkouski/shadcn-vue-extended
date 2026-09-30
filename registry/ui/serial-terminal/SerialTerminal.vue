@@ -2,6 +2,7 @@
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@/lib/utils'
 import prettyBytes from 'pretty-bytes'
+import { shallowRef, useTemplateRef, watch } from 'vue'
 import SerialTerminalInput from './SerialTerminalInput.vue'
 import SerialTerminalOutput from './SerialTerminalOutput.vue'
 import SerialTerminalOutputLine from './SerialTerminalOutputLine.vue'

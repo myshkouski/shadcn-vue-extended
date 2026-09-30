@@ -23,7 +23,7 @@ export const ui = [
     title: 'Serial Terminal',
     description: 'A terminal-like component for serial input and output with a configurable maximum number of entries, automatically removing the oldest when the limit is exceeded.',
     // useSerialTerminal.ts imports notNullish/tryOnScopeDispose from @vueuse/core.
-    dependencies: ['@lucide/vue', '@vueuse/core'],
+    dependencies: ['reka-ui', '@lucide/vue', '@vueuse/core'],
     files: [
       {
         path: 'ui/serial-terminal/index.ts',

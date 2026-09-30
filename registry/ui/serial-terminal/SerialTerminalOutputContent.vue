@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useElementVisibility } from '@vueuse/core'
 import { injectScrollAreaRootContext } from 'reka-ui'
+import { computed, useTemplateRef } from 'vue'
 
 // export interface ContentProps {
 //   entries?: readonly TerminalLineEntry[]

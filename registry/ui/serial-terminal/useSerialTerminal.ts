@@ -1,8 +1,9 @@
 import type { Stoppable } from '@vueuse/core'
-import type { MaybeRefOrGetter } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { UseTerminalReaderOptions } from './useTerminalReader'
 import type { UseTerminalWriterOptions } from './useTerminalWriter'
 import { notNullish, tryOnScopeDispose } from '@vueuse/core'
+import { computed, toValue } from 'vue'
 import { useTerminalReader } from './useTerminalReader'
 import { useTerminalWriter } from './useTerminalWriter'
 

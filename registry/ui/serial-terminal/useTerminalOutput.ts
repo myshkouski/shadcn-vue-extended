@@ -1,3 +1,6 @@
+import type { MaybeRefOrGetter, Ref } from 'vue'
+import { computed, readonly, ref, toValue, watchEffect } from 'vue'
+
 export interface UseTerminalOutputOptions {
   initialEntries?: MaybeRefOrGetter<Iterable<TerminalLineEntry>>
   maxEntries?: MaybeRefOrGetter<number>

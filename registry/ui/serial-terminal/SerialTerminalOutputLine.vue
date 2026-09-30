@@ -2,9 +2,9 @@
 import type { PrimitiveProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 import type { TerminalLineEntry } from './useTerminalOutput'
+import { cn } from '@/lib/utils'
 import { reactiveOmit, useClipboard } from '@vueuse/core'
 import { Primitive } from 'reka-ui'
-import { cn } from '~/lib/utils'
 
 export interface SerialTerminalOutputLineProps extends PrimitiveProps {
   entry: TerminalLineEntry

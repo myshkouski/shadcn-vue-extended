@@ -1,5 +1,7 @@
-import type { Stoppable } from '@vueuse/core'
+import type { MaybeRefOrGetter, Stoppable } from '@vueuse/core'
+import type { Ref } from 'vue'
 import { tryOnScopeDispose, watchImmediate } from '@vueuse/core'
+import { computed, readonly, shallowRef, toValue } from 'vue'
 
 export interface UseTerminalReaderOptions<T> {
   onRead?: (data: T) => Promise<void> | void

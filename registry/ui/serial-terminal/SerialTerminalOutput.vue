@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ScrollAreaRootProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
+import { useTemplateRef } from 'vue'
 import { cn } from '~/lib/utils.ts'
 import SerialTerminalOutputContent from './SerialTerminalOutputContent.vue'
 

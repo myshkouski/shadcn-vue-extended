@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import type { SerialTerminalNewLineToggleModelValue } from './SerialTerminalNewLineToggle.vue'
+import { cn } from '@/lib/utils'
 import { ArrowRightIcon } from '@lucide/vue'
-import { cn } from '~/lib/utils'
+import { ref, shallowRef, useTemplateRef } from 'vue'
 import SerialTerminalNewLineToggle from './SerialTerminalNewLineToggle.vue'
 
 export interface SerialTerminalInputProps {
