@@ -93,7 +93,7 @@ defineExpose({ focus })
       :placeholder="props.placeholder"
       :autofocus="props.autofocus"
       data-slot="serial-terminal-input"
-      class="flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+      class="flex-1 font-mono text-sm outline-none placeholder:opacity-50 disabled:cursor-not-allowed disabled:opacity-50"
       @input="(e) => { input = (e.target as HTMLInputElement).value }"
       @keydown="onKeyDown"
     >

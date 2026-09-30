@@ -178,18 +178,18 @@ type TargetOptions = {
 const targetOptions: readonly TargetOptions[] = [
   {
     name: 'echo',
-    title: 'Echo Terminal',
+    title: 'Echo terminal',
     description: 'Use virtual emulated device for echoing terminal input.',
   },
   {
     name: 'random-generator',
-    title: 'Random Generator',
+    title: 'Random bytes generator',
     description: 'Generates infinite random bytes. Not implemented yet.',
     disabled: true,
   },
   {
     name: 'serial',
-    title: 'Echo Terminal',
+    title: 'Serial port',
     description: 'Connect to a real serial port device using <a class="underline" target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API">WebSerial API</a>.',
   },
 ]
@@ -253,7 +253,8 @@ const targetOptions: readonly TargetOptions[] = [
         </SerialTerminalOutput>
 
         <SerialTerminalInput
-          class="flex-0" 
+          class="flex-0"
+          placeholder="Enter command"
           @send="handleSend"
         />
       </SerialTerminal>
