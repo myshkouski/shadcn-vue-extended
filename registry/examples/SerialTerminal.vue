@@ -6,11 +6,11 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { CopyIcon, LinkIcon, TrashIcon } from '@lucide/vue'
 import { useClipboard, watchImmediate } from '@vueuse/core'
-import { ref } from 'vue'
+import { ref, shallowRef, useTemplateRef } from 'vue'
 import { useSerial } from 'vue-extras'
 import { toast } from 'vue-sonner'
 import { SerialTerminal, SerialTerminalHeader, useSerialTerminal } from '~~/registry/ui/serial-terminal'
-import { Button } from '~/components/ui/button'
+import { Button } from '@/components/ui/button'
 
 const serial = useSerial()
 
