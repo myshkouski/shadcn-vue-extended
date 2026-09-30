@@ -110,7 +110,7 @@ const { copy, isSupported: isCopySupported } = useClipboard()
 function copyAll() {
   if (isCopySupported.value && serialTerminalRef.value) {
     // const content = serialTerminalRef.value
-    copy("").catch(console.error)
+    copy('').catch(console.error)
   }
 }
 
