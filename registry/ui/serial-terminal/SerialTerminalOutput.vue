@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { ScrollAreaRootProps } from 'reka-ui'
+import { ScrollArea } from "~/components/ui/scroll-area"
 import type { HTMLAttributes } from 'vue'
 import { useTemplateRef } from 'vue'
-import { cn } from '~/lib/utils.ts'
+import { cn } from '@/lib/utils.ts'
 import SerialTerminalOutputContent from './SerialTerminalOutputContent.vue'
 
 export interface SerialTerminalOutputProps extends ScrollAreaRootProps {
@@ -21,7 +22,8 @@ defineExpose({
 <template>
   <ScrollArea
     :class="cn(
-      'flex-1 h-full overflow-hidden p-4', props.class,
+      'flex-1 h-full overflow-hidden p-4',
+      props.class,
     )"
   >
     <SerialTerminalOutputContent ref="content">

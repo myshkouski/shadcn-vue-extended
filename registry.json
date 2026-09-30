@@ -33,6 +33,9 @@
         "@lucide/vue",
         "@vueuse/core"
       ],
+      "registryDependencies": [
+        "scroll-area"
+      ],
       "files": [
         {
           "path": "registry/ui/serial-terminal/index.ts",
