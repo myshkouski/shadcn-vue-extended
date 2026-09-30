@@ -1,13 +1,13 @@
 export interface UseTerminalOutputOptions {
-  initialEntries?: MaybeRefOrGetter<Iterable<TerminalLineEntry>>;
-  maxEntries?: MaybeRefOrGetter<number>;
-  onTruncate?: (entries: Iterable<TerminalLineEntry>) => void;
+  initialEntries?: MaybeRefOrGetter<Iterable<TerminalLineEntry>>
+  maxEntries?: MaybeRefOrGetter<number>
+  onTruncate?: (entries: Iterable<TerminalLineEntry>) => void
 }
 
 export interface UseTerminalOutputReturn {
-  entries: Readonly<Ref<readonly TerminalLineEntry[]>>;
-  append(content: string, type: TerminalLineEntryType): void;
-  clear(): void
+  entries: Readonly<Ref<readonly TerminalLineEntry[]>>
+  append: (content: string, type: TerminalLineEntryType) => void
+  clear: () => void
 }
 
 export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTerminalOutputReturn {

@@ -1,32 +1,35 @@
-import type { MaybeRefOrGetter } from "vue"
-import { notNullish, tryOnScopeDispose, type Stoppable } from "@vueuse/core"
-import { useTerminalReader, type UseTerminalReaderOptions } from "./useTerminalReader"
-import { useTerminalWriter, type UseTerminalWriterOptions } from "./useTerminalWriter"
+import type { Stoppable } from '@vueuse/core'
+import type { MaybeRefOrGetter } from 'vue'
+import type { UseTerminalReaderOptions } from './useTerminalReader'
+import type { UseTerminalWriterOptions } from './useTerminalWriter'
+import { notNullish, tryOnScopeDispose } from '@vueuse/core'
+import { useTerminalReader } from './useTerminalReader'
+import { useTerminalWriter } from './useTerminalWriter'
 
 export interface UseSerialTerminalOptions extends UseTerminalReaderOptions<Uint8Array>, UseTerminalWriterOptions {}
 export interface UseSerialTerminalReturn extends Stoppable {
-  write(chunk: Uint8Array): Promise<void>;
-  stop(): void;
-  readonly errors: Readonly<Ref<readonly Error[]>>;
+  write: (chunk: Uint8Array) => Promise<void>
+  stop: () => void
+  readonly errors: Readonly<Ref<readonly Error[]>>
 }
 
 export interface SerialTerminalTarget {
-  readable?: ReadableStream<Uint8Array> | null;
-  writable?: WritableStream<Uint8Array> | null;
+  readable?: ReadableStream<Uint8Array> | null
+  writable?: WritableStream<Uint8Array> | null
 }
 
 export function useSerialTerminal(
-  target: MaybeRefOrGetter<SerialTerminalTarget | null | undefined>, 
-  options?: UseSerialTerminalOptions
+  target: MaybeRefOrGetter<SerialTerminalTarget | null | undefined>,
+  options?: UseSerialTerminalOptions,
 ): UseSerialTerminalReturn {
   const readable = () => toValue(target)?.readable
   const {
     isPending: isReaderPending,
     error: readerError,
     start: startReader,
-    stop: stopReader, 
+    stop: stopReader,
   } = useTerminalReader(readable, {
-    onRead: options?.onRead
+    onRead: options?.onRead,
   })
 
   const writable = () => toValue(target)?.writable
@@ -34,8 +37,8 @@ export function useSerialTerminal(
     isPending: isWriterPending,
     error: writerError,
     start: startWriter,
-    stop: stopWriter, 
-    write, 
+    stop: stopWriter,
+    write,
   } = useTerminalWriter(writable)
 
   const isPending = computed(() => {
@@ -58,8 +61,8 @@ export function useSerialTerminal(
 
   const errors = computed(() => {
     return [
-      readerError.value, 
-      writerError.value
+      readerError.value,
+      writerError.value,
     ].filter(notNullish)
   })
 

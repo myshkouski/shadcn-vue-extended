@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
+import type { SerialTerminalNewLineToggleModelValue } from './SerialTerminalNewLineToggle.vue'
 import { ArrowRightIcon } from '@lucide/vue'
 import { cn } from '~/lib/utils'
-import type { SerialTerminalNewLineToggleModelValue } from './SerialTerminalNewLineToggle.vue'
 import SerialTerminalNewLineToggle from './SerialTerminalNewLineToggle.vue'
 
 export interface SerialTerminalInputProps {
-  class?: HTMLAttributes['class'];
-  disabled?: boolean;
-  placeholder?: string;
-  autofocus?: boolean;
+  class?: HTMLAttributes['class']
+  disabled?: boolean
+  placeholder?: string
+  autofocus?: boolean
 }
 
 export interface SerialTerminalInputEmits {
@@ -102,7 +102,7 @@ defineExpose({ focus })
         v-model="newLine"
       />
     </slot>
-    
+
     <button
       class="rounded p-1 hover:bg-accent focus-visible:bg-accent disabled:opacity-50"
       :disabled="props.disabled || !input.trim()"

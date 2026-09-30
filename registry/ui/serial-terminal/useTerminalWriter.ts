@@ -1,9 +1,10 @@
-import { tryOnScopeDispose, watchImmediate, type Stoppable } from '@vueuse/core'
+import type { Stoppable } from '@vueuse/core'
+import { tryOnScopeDispose, watchImmediate } from '@vueuse/core'
 
 export interface UseTerminalWriterOptions { }
 export interface UseTerminalWriterReturn<T> extends Stoppable {
-  write(chunk: T): Promise<void>;
-  error: Readonly<Ref<Error | null | undefined>>;
+  write: (chunk: T) => Promise<void>
+  error: Readonly<Ref<Error | null | undefined>>
 }
 
 export function useTerminalWriter<T>(

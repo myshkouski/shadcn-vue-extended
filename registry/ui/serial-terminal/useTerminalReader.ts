@@ -1,11 +1,12 @@
-import { tryOnScopeDispose, watchImmediate, type Stoppable } from '@vueuse/core'
+import type { Stoppable } from '@vueuse/core'
+import { tryOnScopeDispose, watchImmediate } from '@vueuse/core'
 
 export interface UseTerminalReaderOptions<T> {
   onRead?: (data: T) => Promise<void> | void
 }
 
 export interface UseTerminalReaderReturn extends Stoppable {
-  error: Readonly<Ref<Error | null | undefined>>;
+  error: Readonly<Ref<Error | null | undefined>>
 }
 
 export function useTerminalReader<T>(
@@ -21,7 +22,8 @@ export function useTerminalReader<T>(
   function start() {
     try {
       reader.value = toValue(readable)?.getReader()
-    } catch (e) {
+    }
+    catch (e) {
       error.value = e as Error
       throw e
     }
@@ -44,7 +46,7 @@ export function useTerminalReader<T>(
     oldReader?.releaseLock()
   })
 
-  watchImmediate(reader, async(reader) => {
+  watchImmediate(reader, async (reader) => {
     const onRead = options?.onRead
     if (reader && onRead) {
       readLoop(reader, onRead).catch((e) => {

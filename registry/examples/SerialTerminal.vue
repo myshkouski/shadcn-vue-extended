@@ -1,15 +1,16 @@
 <script setup lang="ts">
 /// <reference types="@types/w3c-web-serial" />
 
-import { toast } from "vue-sonner"
+import type { SerialTerminalTarget } from '~~/registry/ui/serial-terminal'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { CopyIcon, LinkIcon, TrashIcon } from '@lucide/vue'
 import { useClipboard, watchImmediate } from '@vueuse/core'
 import { ref } from 'vue'
-import { SerialTerminal, SerialTerminalHeader, useSerialTerminal, type SerialTerminalTarget } from '~~/registry/ui/serial-terminal'
+import { useSerial } from 'vue-extras'
+import { toast } from 'vue-sonner'
+import { SerialTerminal, SerialTerminalHeader, useSerialTerminal } from '~~/registry/ui/serial-terminal'
 import { Button } from '~/components/ui/button'
-import { useSerial } from "vue-extras"
 
 const serial = useSerial()
 
@@ -56,14 +57,14 @@ function isSerialPortOpen(port: SerialPort) {
   return port.readable || port.writable
 }
 
-watchImmediate([isTerminalActive, serialTerminalTarget, port], async ([isTerminalActive, target, port], []) => {
+watchImmediate([isTerminalActive, serialTerminalTarget, port], async ([isTerminalActive, target, port]) => {
   if (!isTerminalActive && port && port !== target && isSerialPortOpen(port)) {
     await port?.close()
   }
 })
 
-watchImmediate(errors, errors => {
-  errors.forEach(error => {
+watchImmediate(errors, (errors) => {
+  errors.forEach((error) => {
     toast.error(error.message, { dismissible: false })
   })
 })
@@ -94,7 +95,8 @@ async function toggleConnection() {
     }
 
     port.value = port_
-  } catch (e) {
+  }
+  catch (e) {
     console.error(e)
   }
 }
@@ -108,7 +110,7 @@ const { copy, isSupported: isCopySupported } = useClipboard()
 function copyAll() {
   if (isCopySupported.value && serialTerminalRef.value) {
     // const content = serialTerminalRef.value
-    // copy().catch(console.error)
+    copy("").catch(console.error)
   }
 }
 
