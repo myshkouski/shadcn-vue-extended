@@ -1,5 +1,5 @@
 ---
-title: Serial Terminal
+title: SerialTerminal
 description: A terminal-like component for serial input and output with configurable max entries.
 contributors: ['myshkouski']
 ---
