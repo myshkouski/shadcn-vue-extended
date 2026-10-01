@@ -6,7 +6,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { CopyIcon, LinkIcon, TrashIcon, UnlinkIcon } from '@lucide/vue'
 import { tryOnScopeDispose, useClipboard, watchImmediate } from '@vueuse/core'
-import { computed, ref, shallowRef, onBeforeMount, toRaw, watchEffect } from 'vue'
+import { computed, ref, shallowRef, toRaw, watchEffect, onMounted } from 'vue'
 import { customReactive, useSerial } from 'vue-extras'
 import { toast } from 'vue-sonner'
 import {
@@ -213,15 +213,17 @@ async function disconnect() {
 }
 
 const { copy, isSupported: _isCopySupported } = useClipboard()
-// hydration mismatch workaround
+// Browser-only APIs, so the server render must keep the pessimistic `false`
+// that the client also produces on its first render. `onMounted` runs *after*
+// the initial render; `onBeforeMount` would run before it and desync the two.
 const isCopySupported = shallowRef(false)
-onBeforeMount(() => {
+onMounted(() => {
   isCopySupported.value = _isCopySupported.value
 })
 
-// Same hydration mismatch workaround: `navigator.serial` only exists on the client.
+// Same reasoning: `navigator.serial` only exists on the client.
 const isSerialSupported = shallowRef(false)
-onBeforeMount(() => {
+onMounted(() => {
   isSerialSupported.value = serial.isSupported.value
 })
 
