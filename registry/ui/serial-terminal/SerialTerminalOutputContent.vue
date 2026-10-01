@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useElementVisibility } from '@vueuse/core'
+import { useElementVisibility, watchImmediate } from '@vueuse/core'
 import { injectScrollAreaRootContext } from 'reka-ui'
-import { computed, useTemplateRef, watch, type HTMLAttributes } from 'vue'
+import { computed, useTemplateRef, type HTMLAttributes } from 'vue'
 import type { TerminalLineEntry } from './useTerminalOutput'
 
 export interface ContentProps {
@@ -30,7 +30,7 @@ function scrollToBottom() {
   })
 }
 
-watch(() => props.entries, () => {
+watchImmediate(() => props.entries, () => {
   scrollToBottom()
 }, {
   flush: 'post',
