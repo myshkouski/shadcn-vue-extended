@@ -70,6 +70,10 @@
           "type": "registry:ui"
         },
         {
+          "path": "registry/ui/serial-terminal/useStreamLock.ts",
+          "type": "registry:ui"
+        },
+        {
           "path": "registry/ui/serial-terminal/useTerminalWriter.ts",
           "type": "registry:ui"
         },

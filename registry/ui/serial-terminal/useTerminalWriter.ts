@@ -1,34 +1,29 @@
 import type { MaybeRefOrGetter, Stoppable } from '@vueuse/core'
 import type { Ref } from 'vue'
-import { tryOnScopeDispose, watchImmediate } from '@vueuse/core'
-import { computed, readonly, shallowRef, toValue } from 'vue'
+import type { UseStreamLockReturn } from './useStreamLock'
+import { readonly } from 'vue'
+import { useStreamLock } from './useStreamLock'
 
 export interface UseTerminalWriterOptions { }
 export interface UseTerminalWriterReturn<T> extends Stoppable {
   write: (chunk: T) => Promise<void>
+  isPending: Readonly<Ref<boolean>>
   error: Readonly<Ref<Error | null | undefined>>
 }
 
 export function useTerminalWriter<T>(
   writable: MaybeRefOrGetter<WritableStream<T> | null | undefined>,
 ): UseTerminalWriterReturn<T> {
-  const writer = shallowRef<WritableStreamDefaultWriter<T>>()
-  const error = shallowRef<Error>()
-  const isPending = computed(() => {
-    return !!writer.value
-  })
-
-  // A writer can be detached both here and by the watcher below, and
-  // `releaseLock()` throws once a writer is no longer attached to its stream.
-  const detachedWriters = new WeakSet<WritableStreamDefaultWriter<T>>()
-
-  function detach(target: WritableStreamDefaultWriter<T> | undefined) {
-    if (!target || detachedWriters.has(target))
-      return
-
-    detachedWriters.add(target)
-    target.releaseLock()
-  }
+  const {
+    handle: writer,
+    error,
+    isPending,
+    start,
+    stop,
+  }: UseStreamLockReturn<WritableStreamDefaultWriter<T>> = useStreamLock(
+    writable,
+    stream => stream.getWriter(),
+  )
 
   async function write(chunk: T) {
     const current = writer.value
@@ -56,43 +51,6 @@ export function useTerminalWriter<T>(
       throw e
     }
   }
-
-  function start() {
-    // Released up front rather than left to the watcher below: whoever switched
-    // targets may close the previous one as soon as this returns, and a locked
-    // stream rejects `close()`.
-    detach(writer.value)
-
-    try {
-      writer.value = toValue(writable)?.getWriter()
-    }
-    catch (e) {
-      writer.value = void 0
-      error.value = e as Error
-      throw e
-    }
-    error.value = void 0
-  }
-
-  function stop() {
-    // Detaches the writer and drops its lock right away, so the caller can tear
-    // the target down without waiting for a flush. Closing the sink stays the
-    // responsibility of the target itself.
-    detach(writer.value)
-    writer.value = void 0
-  }
-
-  tryOnScopeDispose(() => {
-    stop()
-  })
-
-  watchImmediate(writer, (_, oldWriter) => {
-    detach(oldWriter)
-  })
-
-  watchImmediate(() => toValue(writable), () => {
-    start()
-  })
 
   return {
     isPending,

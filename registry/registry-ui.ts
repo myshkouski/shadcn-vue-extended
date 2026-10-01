@@ -59,6 +59,10 @@ export const ui = [
         type: 'registry:ui',
       },
       {
+        path: 'ui/serial-terminal/useStreamLock.ts',
+        type: 'registry:ui',
+      },
+      {
         path: 'ui/serial-terminal/useTerminalWriter.ts',
         type: 'registry:ui',
       },
