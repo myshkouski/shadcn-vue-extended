@@ -10,12 +10,14 @@ import { computed, ref, shallowRef, toRaw, watchEffect, onMounted } from 'vue'
 import { customReactive, useSerial } from 'vue-extras'
 import { toast } from 'vue-sonner'
 import {
+  decodeHex,
+  decodeText,
   SerialTerminal,
   SerialTerminalHeader,
-  SerialTerminalOutput,
-  SerialTerminalOutputLine,
-  SerialTerminalOutputContent,
   SerialTerminalInput,
+  SerialTerminalOutput,
+  SerialTerminalOutputContent,
+  SerialTerminalOutputLine,
   useSerialTerminal,
   useTerminalOutput,
 } from '~~/registry/ui/serial-terminal'
@@ -29,6 +31,20 @@ const serialPort = ref<SerialPort>()
 
 const terminalTargetOption = shallowRef<TerminalTargetOption>('echo')
 
+// How a device's bytes become the text of a line: the terminal talks text, so
+// echo, GPS and a real port render as-is, while the random generator emits bytes
+// that only make sense as fixed length hex rows. Lines are rendered as they are
+// written, so switching the option applies to what comes next and leaves the
+// lines already on screen as they were.
+const encoders: Record<TerminalTargetOption, TerminalLineEncoder> = {
+  'echo': decodeText,
+  'gps-emulator': decodeText,
+  'serial': decodeText,
+  'random-generator': decodeHex,
+}
+
+const encodeLine = computed(() => encoders[terminalTargetOption.value])
+
 // Since terminalTargetOption would be reactive, target should be deeply watched ref to track its props
 const terminalDevice = ref<TerminalTargetDevice | null | undefined>()
 
@@ -38,7 +54,6 @@ const randomGenerator = new RandomGenerator()
 const gpsEmulator = new GPSEmulator()
 
 const textEncoder = new TextEncoder()
-const textDecoder = new TextDecoder()
 
 function resolveTerminalTarget(option: TerminalTargetOption): TerminalTargetDevice | null | undefined {
   switch (option) {
@@ -65,6 +80,7 @@ watchEffect(() => {
 const { entries, truncatedBytes, append: appendOutput, clear: clearOutput } = useTerminalOutput({
   maxBytes: 8 * 1024,
   maxLineBytes: 128,
+  encode: encodeLine,
 })
 
 const {
@@ -72,9 +88,11 @@ const {
   errors,
   stop: stopTerminal,
 } = useSerialTerminal(terminalDevice, {
+  // The bytes go to the buffer as they arrived: the encoder decides how a line
+  // of them reads, and keeps the line breaks for text devices so that copying
+  // the output gives the stream back.
   onRead(data) {
-    const message = textDecoder.decode(data)
-    appendOutput(message, 'input')
+    appendOutput(data, 'input')
   },
 })
 
@@ -271,13 +289,13 @@ const targetOptions: readonly TargetOptions[] = [
   {
     name: 'random-generator',
     title: 'Random bytes generator',
-    description: 'Generates infinite random bytes. Not implemented yet.',
+    description: 'Generates infinite random bytes, rendered as fixed length hex rows.',
     // disabled: true,
   },
   {
     name: 'gps-emulator',
     title: 'Virtual GPS module emulator',
-    description: 'Emulates output of the <a class="underline" href="https://content.u-blox.com/sites/default/files/products/documents/NEO-7_DataSheet_%28UBX-13003830%29.pdf" target="_blank">u-blox NEO-7 series</a> GPS module',
+    description: 'Emulates output of <a class="underline" href="https://content.u-blox.com/sites/default/files/products/documents/NEO-7_DataSheet_%28UBX-13003830%29.pdf" target="_blank">u-blox NEO-7 series</a> GPS module.',
   },
   {
     name: 'serial',
@@ -371,7 +389,7 @@ function hasEntries() {
 <!-- eslint-disable vue/block-order -->
 <script lang="ts">
 /* eslint-disable import/first -- imports are hoisted per block, the mocks only need the shared module scope */
-import type { SerialTerminalTarget } from '~~/registry/ui/serial-terminal'
+import type { SerialTerminalTarget, TerminalLineEncoder } from '~~/registry/ui/serial-terminal'
 import { getRandomValues } from 'uncrypto'
 
 // --- debug ------------------------------------------------------------------

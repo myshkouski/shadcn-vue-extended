@@ -1,3 +1,4 @@
+export * from './encoders'
 export {
   default as SerialTerminal,
   type SerialTerminalEmits,
