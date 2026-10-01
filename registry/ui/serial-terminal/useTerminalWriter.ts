@@ -18,6 +18,18 @@ export function useTerminalWriter<T>(
     return !!writer.value
   })
 
+  // A writer can be detached both here and by the watcher below, and
+  // `releaseLock()` throws once a writer is no longer attached to its stream.
+  const detachedWriters = new WeakSet<WritableStreamDefaultWriter<T>>()
+
+  function detach(target: WritableStreamDefaultWriter<T> | undefined) {
+    if (!target || detachedWriters.has(target))
+      return
+
+    detachedWriters.add(target)
+    target.releaseLock()
+  }
+
   async function write(chunk: T) {
     const current = writer.value
 
@@ -46,12 +58,16 @@ export function useTerminalWriter<T>(
   }
 
   function start() {
-    // The previously attached writer is released by the `writer` watcher below,
-    // so assigning here is all it takes to move over to the next target.
+    // Released up front rather than left to the watcher below: whoever switched
+    // targets may close the previous one as soon as this returns, and a locked
+    // stream rejects `close()`.
+    detach(writer.value)
+
     try {
       writer.value = toValue(writable)?.getWriter()
     }
     catch (e) {
+      writer.value = void 0
       error.value = e as Error
       throw e
     }
@@ -59,6 +75,10 @@ export function useTerminalWriter<T>(
   }
 
   function stop() {
+    // Detaches the writer and drops its lock right away, so the caller can tear
+    // the target down without waiting for a flush. Closing the sink stays the
+    // responsibility of the target itself.
+    detach(writer.value)
     writer.value = void 0
   }
 
@@ -67,7 +87,7 @@ export function useTerminalWriter<T>(
   })
 
   watchImmediate(writer, (_, oldWriter) => {
-    oldWriter?.releaseLock()
+    detach(oldWriter)
   })
 
   watchImmediate(() => toValue(writable), () => {
