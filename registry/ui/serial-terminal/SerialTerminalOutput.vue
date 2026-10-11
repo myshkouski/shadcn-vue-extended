@@ -12,12 +12,14 @@ const props = defineProps<SerialTerminalOutputProps>()
 </script>
 
 <template>
-  <ScrollArea
+  <div
     :class="cn(
-      'flex-1 h-full overflow-hidden',
+      'h-full overflow-hidden',
       props.class,
     )"
   >
-    <slot />
-  </ScrollArea>
+    <ScrollArea class="h-full *:data-[slot=scroll-area-viewport]:[overflow-anchor:none]">
+      <slot />
+    </ScrollArea>
+  </div>
 </template>

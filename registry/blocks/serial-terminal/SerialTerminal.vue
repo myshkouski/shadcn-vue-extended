@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /// <reference types="@types/w3c-web-serial" />
 
-import prettyBytes from 'pretty-bytes'
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { CopyIcon, LinkIcon, TrashIcon, UnlinkIcon } from '@lucide/vue'
 import { tryOnScopeDispose, useClipboard, watchImmediate } from '@vueuse/core'
-import { computed, ref, shallowRef, toRaw, watchEffect, onMounted } from 'vue'
+import prettyBytes from 'pretty-bytes'
+import { computed, onMounted, ref, shallowRef, toRaw, watchEffect } from 'vue'
 import { customReactive, useSerial } from 'vue-extras'
 import { toast } from 'vue-sonner'
 import {
@@ -21,13 +22,17 @@ import {
   useSerialTerminal,
   useTerminalOutput,
 } from '~~/registry/ui/serial-terminal'
-import { Button } from '@/components/ui/button'
+import SerialTerminalConnectDialog from './SerialTerminalConnectDialog.vue'
 
 const serial = useSerial()
 
 const input = shallowRef('')
 
 const serialPort = ref<SerialPort>()
+
+// Owned by the connect dialog, which is what decides when a real port is
+// opened: which one, and at which speed.
+const connectDialogOpen = shallowRef(false)
 
 const terminalTargetOption = shallowRef<TerminalTargetOption>('echo')
 
@@ -77,8 +82,13 @@ watchEffect(() => {
   terminalDevice.value = target
 })
 
-const { entries, truncatedBytes, append: appendOutput, clear: clearOutput } = useTerminalOutput({
-  maxBytes: 8 * 1024,
+const {
+  entries,
+  truncatedBytes,
+  append: appendOutput,
+  clear: clearOutput,
+} = useTerminalOutput({
+  maxBytes: 2_048,
   maxLineBytes: 128,
   encode: encodeLine,
 })
@@ -87,6 +97,7 @@ const {
   write,
   errors,
   stop: stopTerminal,
+  state: serialTerminalState,
 } = useSerialTerminal(terminalDevice, {
   // The bytes go to the buffer as they arrived: the encoder decides how a line
   // of them reads, and keeps the line breaks for text devices so that copying
@@ -160,20 +171,9 @@ async function handleSend(content: string) {
   await write(textEncoder.encode(content)).catch(console.error)
 }
 
-async function toggleConnection() {
-  if (isConnected.value) {
-    await disconnect()
-    return
-  }
-
-  await connect()
-}
-
 async function connect() {
   try {
-    const device = 'serial' === terminalTargetOption.value
-      ? await openSerialPort()
-      : terminalDevice.value
+    const device = terminalDevice.value
 
     if (!device)
       return
@@ -189,17 +189,59 @@ async function connect() {
   }
 }
 
-async function openSerialPort() {
-  const port_ = await serial.connect({ filters: [] })
+// The ports the browser already knows about: `useSerial` keeps the list from
+// `getPorts()`, which only holds devices the user granted before. A port seen
+// here can be opened without asking for permission again.
+const serialPortOptions = computed<SerialTerminalPortOption[]>(() => serial.ports.value.map(describePort))
 
-  if (!port_.readable && !port_.writable) {
-    await port_.open({ baudRate: 9_600 })
+async function handleConnect({ portKey, baudRate }: SerialTerminalConnectPayload) {
+  try {
+    const port = serial.ports.value[Number(portKey)]
+
+    if (!port)
+      return
+
+    debug('openSerialPort', { baudRate, port: portKey })
+
+    // Already open: `open()` would throw, and the streams it exposes are the
+    // ones the reader wants anyway.
+    if (!port.readable && !port.writable)
+      await port.open({ baudRate })
+
+    // Drives `terminalDevice` through the `watchEffect` above.
+    serialPort.value = port
+    connectedTarget.value = port
+
+    connectDialogOpen.value = false
   }
+  catch (e) {
+    console.error(e)
+  }
+}
 
-  // Drives `terminalDevice` through the `watchEffect` above.
-  serialPort.value = port_
+// The separate button in the dialog: this click is the user gesture the
+// browser requires to show its device picker, so the request has to run
+// straight from it.
+async function handleRequestPort({ baudRate }: SerialTerminalRequestPortPayload) {
+  try {
+    const port = await serial.connect({ filters: [] })
 
-  return port_
+    if (!port)
+      return
+
+    debug('requestPort', { baudRate })
+
+    if (!port.readable && !port.writable)
+      await port.open({ baudRate })
+
+    serialPort.value = port
+    connectedTarget.value = port
+
+    connectDialogOpen.value = false
+  }
+  catch (e) {
+    console.error(e)
+  }
 }
 
 async function disconnect() {
@@ -248,33 +290,25 @@ onMounted(() => {
 function copyOutput() {
   if (isCopySupported.value) {
     let content = ''
-    for (const entry of entries.value) {
+    // Every line the buffer holds, the one still being written to
+    // included: it is the last element, and dropping it would cut the
+    // stream short.
+    for (const entry of toValue(entries))
       content += entry.content
-    }
+
     copy(content).catch(console.error)
   }
 }
 
 const buttons = computed(() => {
-  const isSerialSelected = 'serial' === terminalTargetOption.value
-  const isConnectedNow = isConnected.value
-
   debug('computed(buttons)', {
     terminalTargetOption: terminalTargetOption.value,
-    isConnected: isConnectedNow,
+    isConnected: isConnected.value,
     isSerialSupported: isSerialSupported.value,
     isCopySupported: isCopySupported.value,
   })
 
   return [
-    {
-      label: isConnectedNow ? 'Disconnect' : 'Connect',
-      icon: isConnectedNow ? UnlinkIcon : LinkIcon,
-      action: toggleConnection,
-      // A serial port can only be picked from a user gesture, and only where the
-      // browser exposes the API at all.
-      disabled: isSerialSelected && !isSerialSupported.value,
-    },
     { label: 'Copy', icon: CopyIcon, action: copyOutput, disabled: !isCopySupported.value },
     { label: 'Clear', icon: TrashIcon, action: clearOutput },
   ]
@@ -305,11 +339,21 @@ const targetOptions: readonly TargetOptions[] = [
 ]
 
 function hasEntries() {
-  for (const _ of entries.value) {
-    return true
-  }
-  return false
+  // The line being written to is the last entry: without it the
+  // placeholder would flash for as long as the first line takes to
+  // arrive.
+  return !!toValue(entries)[Symbol.iterator]().next().value
 }
+
+const terminalStateText = computed(() => {
+  return Object.entries({
+    'r': serialTerminalState.value.readable,
+    'w': serialTerminalState.value.writable,
+  }).reduce((text, [char, enabled]) => {
+    if (enabled) text += char
+    return text
+  }, '')
+})
 </script>
 
 <template>
@@ -319,15 +363,19 @@ function hasEntries() {
       <RadioGroup v-model="terminalTargetOption">
         <div
           v-for="{ name, title, description, disabled } in targetOptions"
+          :key="name"
           class="flex items-start space-x-2"
         >
-          <RadioGroupItem :disabled="disabled" id="r1" :value="name" />
-          <Label for="echo" :class="[
-            'flex-col items-start gap-0',
-            { 'opacity-50': disabled },
-          ]">
+          <RadioGroupItem :id="`device-${name}`" :disabled="disabled" :value="name" />
+          <Label
+            :for="`device-${name}`"
+            class="flex-col items-start gap-0"
+            :class="[
+              { 'opacity-50': disabled },
+            ]"
+          >
             <span class="text-foreground">{{ title }}</span>
-            <span class="text-sm" v-html="description"></span>
+            <span class="text-sm" v-html="description" />
           </Label>
         </div>
       </RadioGroup>
@@ -338,6 +386,53 @@ function hasEntries() {
         class="size-full"
       >
         <SerialTerminalHeader>
+          <span class="text-xs">{{ terminalStateText }}</span>
+          <!--
+            Only a real port has to be picked and configured: the dialog lists
+            the ports the browser already knows about and the baud rate to open
+            one with. The emulators have neither, so their connect button opens
+            them straight away.
+          -->
+          <SerialTerminalConnectDialog
+            v-if="'serial' === terminalTargetOption && !isConnected"
+            v-model:open="connectDialogOpen"
+            :ports="serialPortOptions"
+            allow-request-port
+            @connect="handleConnect"
+            @request-port="handleRequestPort"
+          >
+            <template #trigger>
+              <Button
+                variant="ghost"
+                size="sm"
+                aria-label="Connect"
+                :disabled="!isSerialSupported"
+              >
+                <LinkIcon class="size-3" />
+              </Button>
+            </template>
+          </SerialTerminalConnectDialog>
+
+          <Button
+            v-else-if="!isConnected"
+            variant="ghost"
+            size="sm"
+            aria-label="Connect"
+            @click="connect"
+          >
+            <LinkIcon class="size-3" />
+          </Button>
+
+          <Button
+            v-if="isConnected"
+            variant="ghost"
+            size="sm"
+            aria-label="Disconnect"
+            @click="disconnect"
+          >
+            <UnlinkIcon class="size-3" />
+          </Button>
+
           <Button
             v-for="(item, index) in buttons"
             :key="index"
@@ -363,7 +458,10 @@ function hasEntries() {
             No output yet. Type a command and press Enter.
           </p>
 
-          <SerialTerminalOutputContent :entries v-slot="{ entry }">
+          <SerialTerminalOutputContent
+            v-slot="{ entry }"
+            :entries
+          >
             <SerialTerminalOutputLine :entry />
           </SerialTerminalOutputContent>
         </SerialTerminalOutput>
@@ -371,6 +469,7 @@ function hasEntries() {
         <SerialTerminalInput
           class="flex-0"
           placeholder="Enter command"
+          :disabled="!serialTerminalState.writable"
           @send="handleSend"
         />
       </SerialTerminal>
@@ -390,6 +489,7 @@ function hasEntries() {
 <script lang="ts">
 /* eslint-disable import/first -- imports are hoisted per block, the mocks only need the shared module scope */
 import type { SerialTerminalTarget, TerminalLineEncoder } from '~~/registry/ui/serial-terminal'
+import type { SerialTerminalConnectPayload, SerialTerminalPortOption, SerialTerminalRequestPortPayload } from './SerialTerminalConnectDialog.vue'
 import { getRandomValues } from 'uncrypto'
 
 // --- debug ------------------------------------------------------------------
@@ -407,16 +507,16 @@ type TerminalTargetOption =
   | 'gps-emulator'
   | 'serial'
 
-type TargetOptions = {
-  name: TerminalTargetOption;
+interface TargetOptions {
+  name: TerminalTargetOption
   title: string
   description: string
   disabled?: boolean
 }
 
 interface TerminalTargetDevice extends SerialTerminalTarget {
-  open(...args: any[]): Promise<void> | void;
-  close(): Promise<void> | void;
+  open: (...args: any[]) => Promise<void> | void
+  close: () => Promise<void> | void
 }
 
 // --- utils ------------------------------------------------------------------
@@ -452,6 +552,34 @@ function describeStream(stream: ReadableStream<Uint8Array> | WritableStream<Uint
   return stream.locked ? 'locked' : 'unlocked'
 }
 
+function readPortInfo(port: SerialPort): SerialPortInfo {
+  // Only exposed to a granted port, so a device can refuse it.
+  try {
+    return port.getInfo()
+  }
+  catch {
+    return {}
+  }
+}
+
+function describePort(port: SerialPort, index: number): SerialTerminalPortOption {
+  const { usbVendorId, usbProductId } = readPortInfo(port)
+  const ids = [usbVendorId, usbProductId]
+    .filter((id): id is number => typeof id === 'number')
+    .map(id => id.toString(16).padStart(4, '0'))
+  const isOpen = !!port.readable || !!port.writable
+
+  return {
+    // `SerialPort` carries no id of its own, and its USB ids collide between two
+    // identical devices. The position in the list is the one handle that stays
+    // unique, and it is exactly what `handleConnect` resolves against.
+    key: String(index),
+    label: ids.length ? `USB ${ids.join(':')}` : `Serial port ${index + 1}`,
+    description: isOpen ? 'Already open' : 'Available',
+    open: isOpen,
+  }
+}
+
 function describeDevice(device: TerminalTargetDevice | null | undefined): string {
   if (!device)
     return String(device)
@@ -460,8 +588,10 @@ function describeDevice(device: TerminalTargetDevice | null | undefined): string
 }
 
 async function delay(ms: number): Promise<void> {
-  return new Promise(resolve => {
-    setTimeout(() => { resolve() }, ms)
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve()
+    }, ms)
   })
 }
 
@@ -493,12 +623,12 @@ function toReactiveDevice(device: TerminalTargetDevice) {
 // --- byte stream source -----------------------------------------------------
 
 class DefaultUnderlyingByteSource implements UnderlyingByteSource {
-  readonly type = 'bytes';
+  readonly type = 'bytes'
 
   private cancelled = false
 
   constructor(
-    private readonly read: (chunkSize: number) => PromiseLike<ArrayBufferView<ArrayBuffer>> | ArrayBufferView<ArrayBuffer>
+    private readonly read: (chunkSize: number) => PromiseLike<ArrayBufferView<ArrayBuffer>> | ArrayBufferView<ArrayBuffer>,
   ) {}
 
   async pull(controller: ReadableByteStreamController): Promise<void> {
@@ -540,10 +670,11 @@ abstract class VirtualDevice implements TerminalTargetDevice {
     return this._writable
   }
 
-  protected abstract _open(...args: any[]): Promise<void> | void;
+  protected abstract _open(...args: any[]): Promise<void> | void
 
   async open(...args: any[]) {
-    if (this.readable || this.writable) return
+    if (this.readable || this.writable)
+      return
     debug('VirtualDevice#open', 'before open', this)
     await this._open(...args)
     debug('VirtualDevice#open', 'opened', this)
@@ -590,25 +721,30 @@ class EchoTerminal extends VirtualDevice {
       },
     })
 
-    this._writable = new WritableStream({
-      write: (chunk) => {
-        this.controller?.enqueue(chunk)
+    this._writable = new WritableStream(
+      {
+        write: (chunk) => {
+          this.controller?.enqueue(new Uint8Array(chunk.buffer))
+        },
       },
-    })
+      {
+        highWaterMark: 512,
+      }
+    )
   }
 }
 
 class RandomGenerator extends VirtualDevice {
   _open() {
     const byteSource = new DefaultUnderlyingByteSource(async (size) => {
-      // Without a tick of its own this produces as fast as the event loop can
-      // turn, which starves rendering instead of stressing the output buffer.
-      await delay(16)
       return getRandomValues(new Uint8Array(size))
     })
-    this._readable = new ReadableStream(byteSource, {
-      highWaterMark: 256,
-    })
+    this._readable = new ReadableStream(
+      byteSource,
+      {
+        highWaterMark: 1024,
+      }
+    )
   }
 }
 
@@ -624,15 +760,18 @@ class GPSEmulator extends VirtualDevice {
         '$GPGGA,,,,,,0,00,99.99,,,,,,*48',
         '$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30',
         '$GPGLL,,,,,,V,N*64',
-        ''
+        '',
       ].join('\r\n')
 
       return textEncoder.encode(output)
     })
 
-    this._readable = new ReadableStream(byteSource, {
-      highWaterMark: 512,
-    })
+    this._readable = new ReadableStream(
+      byteSource, 
+      {
+        highWaterMark: 512,
+      }
+    )
   }
 }
 </script>

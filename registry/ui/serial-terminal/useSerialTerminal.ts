@@ -12,11 +12,17 @@ export interface UseSerialTerminalReturn extends Stoppable {
   write: (chunk: Uint8Array) => Promise<void>
   stop: () => void
   readonly errors: Readonly<Ref<readonly Error[]>>
+  readonly state: Readonly<Ref<SerialTerminalState>>
 }
 
 export interface SerialTerminalTarget {
   readable?: ReadableStream<Uint8Array> | null
   writable?: WritableStream<Uint8Array> | null
+}
+
+export type SerialTerminalState = {
+  readable: boolean;
+  writable: boolean;
 }
 
 export function useSerialTerminal(
@@ -30,6 +36,9 @@ export function useSerialTerminal(
     start: startReader,
     stop: stopReader,
   } = useTerminalReader(readable, {
+    // The reader's own options ride along with the writer's, of which only
+    // `onRead` belongs here.
+    ...options,
     onRead: options?.onRead,
   })
 
@@ -44,6 +53,13 @@ export function useSerialTerminal(
 
   const isPending = computed(() => {
     return isReaderPending.value && isWriterPending.value
+  })
+
+  const state = computed<SerialTerminalState>(() => {
+    return {
+      readable: isReaderPending.value,
+      writable: isWriterPending.value,
+    }
   })
 
   function start() {
@@ -68,6 +84,7 @@ export function useSerialTerminal(
   })
 
   return {
+    state,
     isPending,
     errors,
     write,

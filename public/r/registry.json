@@ -205,6 +205,40 @@
       ]
     },
     {
+      "name": "serial-terminal-01",
+      "type": "registry:block",
+      "title": "Serial Terminal 01",
+      "description": "A serial terminal with a device picker, baud rate selection and a bounded output buffer.",
+      "dependencies": [
+        "reka-ui",
+        "@lucide/vue",
+        "@vueuse/core",
+        "pretty-bytes",
+        "uncrypto",
+        "vue-extras",
+        "vue-sonner"
+      ],
+      "registryDependencies": [
+        "serial-terminal",
+        "button",
+        "card",
+        "dialog",
+        "label",
+        "radio-group",
+        "select"
+      ],
+      "files": [
+        {
+          "path": "registry/blocks/serial-terminal/SerialTerminal.vue",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/blocks/serial-terminal/SerialTerminalConnectDialog.vue",
+          "type": "registry:component"
+        }
+      ]
+    },
+    {
       "name": "dialog-01",
       "type": "registry:block",
       "title": "Dialog 01",

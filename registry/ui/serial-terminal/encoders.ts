@@ -82,3 +82,17 @@ export const decodeHex: TerminalBinaryEncoder = {
   lineBytes: DEFAULT_BINARY_LINE_BYTES,
   encode: decodeHexLine,
 }
+
+export class HexDecoderStream extends TransformStream<Uint8Array, string> {
+  constructor() {
+    super({
+      transform(chunk, controller) {
+        const value = [...chunk].map(byte => {
+          return byte.toString(16).padStart(2, '0')
+        }).join(' ')
+        
+        controller.enqueue(value)
+      }
+    })
+  }
+}

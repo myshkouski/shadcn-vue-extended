@@ -1,6 +1,6 @@
 import type { MaybeRef, MaybeRefOrGetter, Ref } from 'vue'
 import type { TerminalLineEncoder } from './encoders'
-import { computed, readonly, ref, shallowRef, toValue, unref } from 'vue'
+import { computed, readonly, shallowReactive, shallowRef, toRaw, toValue, unref } from 'vue'
 import { decodeHex, decodeText, DEFAULT_BINARY_LINE_BYTES } from './encoders'
 
 const DEFAULT_MAX_BYTES = 256 * 1024
@@ -36,8 +36,21 @@ export interface UseTerminalOutputOptions {
   onTruncate?: (bytes: number | bigint) => void
 }
 
+/**
+ * The terminal's line buffer is exposed as an `Iterable` of entries — the same
+ * shape `v-for` walks — plus a single reactive `byteLength`. Consumers watch
+ * `byteLength` (O(1), updated on every append/evict/clear, including in-place
+ * growth of the open line) instead of re-counting entries: the array holds up
+ * to `maxBytes` of lines, so a length walk on every write is the cost the
+ * autoscroll has no business paying.
+ */
+export interface TerminalOutputBuffer extends Iterable<TerminalLineEntry> {
+  /** Total content bytes currently held by the buffer (reactive). */
+  readonly byteLength: number | bigint
+}
+
 export interface UseTerminalOutputReturn {
-  entries: Readonly<Ref<Iterable<TerminalLineEntry>>>
+  entries: Readonly<MaybeRef<readonly TerminalLineEntry[]>>
   /**
    * Amount of content bytes currently kept in the buffer, including the bytes
    * of a binary line that has not been rendered yet.
@@ -112,7 +125,7 @@ interface LineSegment {
 }
 
 export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTerminalOutputReturn {
-  const entries = ref<TerminalLineEntry[]>([])
+  const entries = shallowReactive<TerminalLineEntry[]>([])
   const sizeBytes = shallowRef<number | bigint>(0)
   const truncatedBytes = shallowRef<number | bigint>(0)
 
@@ -249,21 +262,20 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
   }
 
   function appendText(bytes: Uint8Array, type: TerminalLineEntryType) {
-    const list = entries.value
     let index = 0
 
     // Content that does not start with a line break continues the last line,
     // which is what makes a device writing without a trailing newline still
     // fill the line it is on.
-    if (list.length > 0) {
+    if (entries.length > 0) {
       const segment = readSegment(bytes, 0)
-      writeText(list[list.length - 1]!, bytes, segment)
+      writeText(entries[entries.length - 1]!, bytes, segment)
       index = segment.next
     }
 
     while (index < bytes.length) {
       const segment = readSegment(bytes, index)
-      list.push(createLine(type, bytes, segment))
+      entries.push(createLine(type, bytes, segment))
       index = segment.next
     }
 
@@ -271,7 +283,6 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
   }
 
   function appendBinary(bytes: Uint8Array, type: TerminalLineEntryType) {
-    const list = entries.value
     const lineBytes = binaryLineBytes()
     let line: Uint8Array = pending
     let index = 0
@@ -289,7 +300,7 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
       if (line.length < lineBytes)
         break
 
-      list.push({
+      entries.push({
         id: createId(),
         type,
         bytes: line,
@@ -319,23 +330,22 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
   }
 
   function evict() {
-    const list = entries.value
     const limit = maxBytes.value
 
     // The line currently being written to is always kept, `maxLineBytes` is the
     // hard ceiling for it.
-    if (sizeBytes.value <= limit || list.length <= 1)
+    if (sizeBytes.value <= limit || entries.length <= 1)
       return
 
     let count = 0
     let remaining: number | bigint = sizeBytes.value
 
-    while (count < list.length - 1 && remaining > limit) {
-      remaining = differenceOf(remaining, asState(list[count]!).byteLength)
+    while (count < entries.length - 1 && remaining > limit) {
+      remaining = differenceOf(remaining, asState(entries[count]!).byteLength)
       count++
     }
 
-    for (const entry of list.splice(0, count)) {
+    for (const entry of entries.splice(0, count)) {
       const line = asState(entry)
       sizeBytes.value = differenceOf(sizeBytes.value, line.byteLength)
       drop(line, line.byteLength)
@@ -362,7 +372,7 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
 
   function clear() {
     pending = EMPTY_BYTES
-    entries.value = []
+    entries.length = 0
     sizeBytes.value = 0
     truncatedBytes.value = 0
   }
@@ -373,7 +383,7 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
     for (const entry of initialEntries) {
       const bytes = toBytes(entry.content)
       const segment = { start: 0, end: bytes.length, next: bytes.length }
-      entries.value.push(createLine(entry.type, bytes, segment))
+      entries.push(createLine(entry.type, bytes, segment))
     }
     evict()
   }

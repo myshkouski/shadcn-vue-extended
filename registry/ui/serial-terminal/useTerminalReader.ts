@@ -5,6 +5,12 @@ import { watchImmediate } from '@vueuse/core'
 import { readonly } from 'vue'
 import { useStreamLock } from './useStreamLock'
 
+/**
+ * How long a yield may wait for idle time before it goes anyway: a reader that
+ * never yields again is a stream that is never shown.
+ */
+const IDLE_TIMEOUT_MS = 40
+
 export interface UseTerminalReaderOptions<T> {
   onRead?: (data: T) => Promise<void> | void
 }
@@ -72,5 +78,15 @@ async function readLoop<T>(
     if (result.done) {
       break
     }
+
+    await yieldToIdle()
   }
+}
+
+function yieldToIdle(): Promise<void> {
+  return new Promise((resolve) => {
+    requestIdleCallback(() => {
+      resolve()
+    }, { timeout: IDLE_TIMEOUT_MS })
+  })
 }

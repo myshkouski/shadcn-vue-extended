@@ -1,55 +1,73 @@
 <script setup lang="ts">
-import { useElementVisibility, watchImmediate } from '@vueuse/core'
-import { injectScrollAreaRootContext } from 'reka-ui'
-import { computed, useTemplateRef, type HTMLAttributes } from 'vue'
+import type { HTMLAttributes } from 'vue'
 import type { TerminalLineEntry } from './useTerminalOutput'
+import { injectScrollAreaRootContext } from 'reka-ui'
+import { computed, onMounted, shallowRef } from 'vue'
+import { watchImmediate } from '@vueuse/core'
 
 export interface ContentProps {
-  entries?: Iterable<TerminalLineEntry>
+  /**
+   * The lines of the buffer, oldest first: sealed lines, then the line
+   * currently being written to as the last element, if any.
+   */
+  entries?: readonly TerminalLineEntry[]
   class?: HTMLAttributes['class']
 }
 
 const props = defineProps<ContentProps>()
 const scrollContext = injectScrollAreaRootContext()
-const visibilityElement = useTemplateRef('visibilityElement')
-const viewportElement = computed(() => {
-  return scrollContext.viewport.value
-})
-
-const isVisibilityElementVisible = useElementVisibility(visibilityElement, {
-  scrollTarget: viewportElement,
-  // rootMargin: '50% '.repeat(4),
-})
+const viewport = computed(() => scrollContext.viewport.value)
 
 function scrollToBottom() {
-  if (!isVisibilityElementVisible.value)
-    return
-
-  viewportElement.value?.scrollTo({
+  viewport.value?.scrollTo({
     top: Number.MAX_SAFE_INTEGER,
+    behavior: 'instant',
   })
 }
 
-watchImmediate(() => props.entries, () => {
-  scrollToBottom()
-}, {
-  flush: 'post',
-  deep: 2,
+// True when the next write should keep the new bottom in view. Sampled
+// *before* new lines reach the DOM to avoid the race an observer creates.
+const isFollowing = shallowRef(true)
+
+function isViewportAtBottom(): boolean {
+  const el = viewport.value
+  if (!el)
+    return isFollowing.value
+  // Sub-pixel slack
+  const res = el.scrollHeight - el.scrollTop - el.clientHeight
+  // console.debug("!", res, el.scrollHeight, el.scrollTop, el.clientHeight)
+  return res < 1
+}
+
+const entriesHash = computed(() => {
+  if (!props.entries) return -1
+  return `${props.entries.length}-${props.entries.at(-1)?.byteLength ?? 0}-${props.entries.at(-1)?.id ?? null}`
 })
 
+// Decide whether to follow *before* the patch...
+watchImmediate(entriesHash, () => {
+  isFollowing.value = isViewportAtBottom()
+}, { flush: 'pre' })
+
+// ...and only scroll *after* the patch.
+watchImmediate([entriesHash, isFollowing], ([entriesHash, following]) => {
+  if (following)
+    scrollToBottom()
+}, { flush: 'post' })
+
+onMounted(() => {
+  isFollowing.value = isViewportAtBottom()
+  scrollToBottom()
+})
 </script>
 
 <template>
-  <template
+  <div
     v-for="entry in entries"
     :key="entry.id"
+    v-memo="[entry.id, entry.byteLength]"
+    class="px-4 first:mt-4 last:mb-4 hover:bg-accent/50"
   >
-    <div
-      class="px-4 first:mt-4 hover:bg-accent/50"
-    >
-      <slot :entry />
-    </div>
-  </template>
-
-  <div ref="visibilityElement" class="relative bottom-0 mb-4" />
+    <slot :entry />
+  </div>
 </template>
