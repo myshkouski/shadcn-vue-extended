@@ -229,6 +229,10 @@
       ],
       "files": [
         {
+          "path": "registry/blocks/serial-terminal/index.ts",
+          "type": "registry:component"
+        },
+        {
           "path": "registry/blocks/serial-terminal/SerialTerminal.vue",
           "type": "registry:component"
         },

@@ -30,6 +30,10 @@ export const block = [
     ],
     files: [
       {
+        path: 'blocks/serial-terminal/index.ts',
+        type: 'registry:component',
+      },
+      {
         path: 'blocks/serial-terminal/SerialTerminal.vue',
         type: 'registry:component',
       },
