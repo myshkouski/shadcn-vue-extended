@@ -1,7 +1,6 @@
 export * from './encoders'
 export {
   default as SerialTerminal,
-  type SerialTerminalEmits,
   type SerialTerminalProps,
 } from './SerialTerminal.vue'
 export {

@@ -4,23 +4,9 @@ import { cn } from '@/lib/utils'
 
 export interface SerialTerminalProps {
   class?: HTMLAttributes['class']
-  // modelValue?: string
-  // placeholder?: string
-  // disabled?: boolean
-  // autofocus?: boolean
 }
 
-export interface SerialTerminalEmits {
-  // (e: 'send', payload: { content: string }): void
-  // (e: 'clear'): void
-}
-
-const props = withDefaults(defineProps<SerialTerminalProps>(), {
-  // disabled: false,
-  // autofocus: false,
-})
-
-const emit = defineEmits<SerialTerminalEmits>()
+const props = defineProps<SerialTerminalProps>()
 </script>
 
 <template>
