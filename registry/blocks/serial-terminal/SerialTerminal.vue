@@ -4,8 +4,8 @@
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { CopyIcon, LinkIcon, TrashIcon, UnlinkIcon } from '@lucide/vue'
-import { tryOnScopeDispose, useClipboard, watchImmediate } from '@vueuse/core'
+import { CopyIcon, LinkIcon, TrashIcon, UnlinkIcon, ArrowDownIcon } from '@lucide/vue'
+import { throttledRef, tryOnScopeDispose, useClipboard, watchImmediate } from '@vueuse/core'
 import prettyBytes from 'pretty-bytes'
 import { computed, onMounted, ref, shallowRef, toRaw, watchEffect } from 'vue'
 import { customReactive, useSerial } from 'vue-extras'
@@ -82,15 +82,19 @@ watchEffect(() => {
   terminalDevice.value = target
 })
 
+const truncatedBytes = shallowRef<number | bigint>(0)
+const throttledTruncatedBytes = throttledRef(truncatedBytes, 1_000, true)
 const {
   entries,
-  truncatedBytes,
   append: appendOutput,
   clear: clearOutput,
 } = useTerminalOutput({
-  maxBytes: 2_048,
-  maxLineBytes: 128,
+  maxBytes: 16 * 1_024,
+  maxLineBytes: 512,
   encode: encodeLine,
+  onTruncate(bytes) {
+    truncatedBytes.value = BigInt(truncatedBytes.value) + BigInt(bytes)
+  },
 })
 
 const {
@@ -354,6 +358,8 @@ const terminalStateText = computed(() => {
     return text
   }, '')
 })
+
+const isFollowingOutput = shallowRef(true)
 </script>
 
 <template>
@@ -446,25 +452,39 @@ const terminalStateText = computed(() => {
           </Button>
         </SerialTerminalHeader>
 
-        <SerialTerminalOutput class="flex-1">
-          <p
-            v-if="truncatedBytes > 0"
-            class="p-4 text-muted-foreground/50 text-xs italic"
-          >
-            {{ prettyBytes(truncatedBytes, { space: false }) }} truncated
-          </p>
+        <div class="relative flex-1 overflow-hidden">
+          <SerialTerminalOutput class="h-full">
+            <p
+              v-if="throttledTruncatedBytes > 0"
+              class="p-4 text-muted-foreground/50 text-xs italic"
+            >
+              {{ prettyBytes(throttledTruncatedBytes, { space: false }) }} truncated
+            </p>
 
-          <p v-if="!hasEntries()" class="p-4 text-muted-foreground text-xs italic select-none">
-            No output yet. Type a command and press Enter.
-          </p>
+            <p v-if="!hasEntries()" class="p-4 text-muted-foreground text-xs italic select-none">
+              No output yet. Type a command and press Enter.
+            </p>
 
-          <SerialTerminalOutputContent
-            v-slot="{ entry }"
-            :entries
+            <SerialTerminalOutputContent
+              v-slot="{ entry }"
+              :entries
+              v-model:follow="isFollowingOutput"
+            >
+              <SerialTerminalOutputLine :entry />
+            </SerialTerminalOutputContent>
+          </SerialTerminalOutput>
+
+          <Button 
+            v-show="!isFollowingOutput"
+            @click="isFollowingOutput = true"
+            class="absolute bottom-4 right-4" 
+            variant="outline"
+            size="icon" 
+            aria-label="Follow output"
           >
-            <SerialTerminalOutputLine :entry />
-          </SerialTerminalOutputContent>
-        </SerialTerminalOutput>
+            <ArrowDownIcon />
+          </Button>
+        </div>
 
         <SerialTerminalInput
           class="flex-0"
@@ -491,6 +511,7 @@ const terminalStateText = computed(() => {
 import type { SerialTerminalTarget, TerminalLineEncoder } from '~~/registry/ui/serial-terminal'
 import type { SerialTerminalConnectPayload, SerialTerminalPortOption, SerialTerminalRequestPortPayload } from './SerialTerminalConnectDialog.vue'
 import { getRandomValues } from 'uncrypto'
+import { bigint } from 'zod'
 
 // --- debug ------------------------------------------------------------------
 

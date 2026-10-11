@@ -57,10 +57,6 @@ export interface UseTerminalOutputReturn {
    */
   sizeBytes: Readonly<Ref<number | bigint>>
   /**
-   * Amount of content bytes dropped since the last `clear()` call.
-   */
-  truncatedBytes: Readonly<Ref<number | bigint>>
-  /**
    * Appends `data` to the buffer, grouped into lines by the active encoder.
    * Text is encoded into bytes first, so lines the terminal itself produces
    * share the buffer with device output.
@@ -127,7 +123,6 @@ interface LineSegment {
 export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTerminalOutputReturn {
   const entries = shallowReactive<TerminalLineEntry[]>([])
   const sizeBytes = shallowRef<number | bigint>(0)
-  const truncatedBytes = shallowRef<number | bigint>(0)
 
   const maxBytes = computed(() => Math.max(0, toValue(options?.maxBytes) ?? DEFAULT_MAX_BYTES))
   const maxLineBytes = computed(() => Math.max(0, toValue(options?.maxLineBytes) ?? DEFAULT_MAX_LINE_BYTES))
@@ -176,7 +171,6 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
     if (bytes <= 0)
       return
     line.droppedBytes = sumOf(line.droppedBytes, bytes)
-    truncatedBytes.value = sumOf(truncatedBytes.value, bytes)
     onTruncate?.(bytes)
   }
 
@@ -323,7 +317,6 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
 
     // The bytes of a line that was never rendered would be split by the next
     // encoder differently than the binary one did, so they cannot be kept.
-    truncatedBytes.value = sumOf(truncatedBytes.value, pending.length)
     sizeBytes.value = differenceOf(sizeBytes.value, pending.length)
     onTruncate?.(pending.length)
     pending = EMPTY_BYTES
@@ -374,7 +367,6 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
     pending = EMPTY_BYTES
     entries.length = 0
     sizeBytes.value = 0
-    truncatedBytes.value = 0
   }
 
   const initialEntries = toValue(options?.initialEntries)
@@ -391,7 +383,6 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
   return {
     entries: readonly(entries),
     sizeBytes: readonly(sizeBytes),
-    truncatedBytes: readonly(truncatedBytes),
     append,
     clear,
   }
