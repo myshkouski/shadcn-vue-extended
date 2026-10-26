@@ -1,5 +1,5 @@
 import type { MaybeRef, MaybeRefOrGetter, Ref } from 'vue'
-import type { TerminalLineEncoder } from './encoders'
+import type { TerminalDecodedLine, TerminalLineEncoder } from './encoders'
 import { computed, readonly, shallowReactive, shallowRef, toRaw, toValue, unref } from 'vue'
 import { decodeHex, decodeText, DEFAULT_BINARY_LINE_BYTES } from './encoders'
 
@@ -61,7 +61,7 @@ export interface UseTerminalOutputReturn {
    * Text is encoded into bytes first, so lines the terminal itself produces
    * share the buffer with device output.
    */
-  append: (data: Uint8Array | string, type: TerminalLineEntryType) => void
+  append: (data: Uint8Array | string | TerminalDecodedLine, type: TerminalLineEntryType) => void
   clear: () => void
 }
 
@@ -345,8 +345,37 @@ export function useTerminalOutput(options?: UseTerminalOutputOptions): UseTermin
     }
   }
 
-  function append(data: Uint8Array | string, type: TerminalLineEntryType) {
-    const bytes = toBytes(data)
+  function append(data: Uint8Array | string | TerminalDecodedLine, type: TerminalLineEntryType) {
+    // When a decoder stream emits a completed line (e.g. a binary hex line), it
+    // hands over a `TerminalDecodedLine` with `bytes` and `content` already
+    // rendered. Those completed lines bypass text splitting and in-place growth.
+    if (data && typeof data === 'object' && 'bytes' in data && 'content' in data) {
+      const decoded = data as TerminalDecodedLine
+      const bytes = decoded.bytes
+
+      const next = unref(options?.encode) ?? decodeText
+      if (next !== encoding) {
+        encoding = next
+        dropPending()
+      }
+
+      const byteLength = bytes.length
+      sizeBytes.value = sumOf(sizeBytes.value, byteLength)
+
+      entries.push({
+        id: createId(),
+        type,
+        bytes,
+        content: decoded.content,
+        byteLength,
+        droppedBytes: 0,
+      })
+
+      evict()
+      return
+    }
+
+    const bytes = toBytes(data as Uint8Array | string)
     if (!bytes.length)
       return
 

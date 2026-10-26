@@ -3,7 +3,7 @@ import type { HTMLAttributes } from 'vue'
 import type { TerminalLineEntry } from './useTerminalOutput'
 import { injectScrollAreaRootContext } from 'reka-ui'
 import { computed, onMounted } from 'vue'
-import { useEventListener, watchImmediate, watchThrottled } from '@vueuse/core'
+import { useEventListener, watchImmediate } from '@vueuse/core'
 
 export interface ContentProps {
   /**
@@ -46,26 +46,26 @@ const entriesHash = computed(() => {
   return `${props.entries.length}-${props.entries.at(-1)?.byteLength ?? 0}-${props.entries.at(-1)?.id ?? null}`
 })
 
-watchImmediate(isFollowing, isFollowing => {
-  if (isFollowing) {
-    scrollToBottom()
+// Sample follow state *before* new lines reach the DOM to avoid the race.
+watchImmediate(entriesHash, () => {
+  if (viewport.value) {
+    isFollowing.value = isViewportAtBottom(viewport.value)
   }
-})
+}, { flush: 'pre' })
 
-watchThrottled([entriesHash, isFollowing], ([_, following]) => {
+// Scroll to bottom *after* the DOM patch when following.
+watchImmediate([entriesHash, isFollowing], ([, following]) => {
   if (following) {
     scrollToBottom()
   }
-}, {
-  throttle: () => props.throttle ?? 40,
-  trailing: true,
-  immediate: true,
-  flush: 'post'
-})
+}, { flush: 'post' })
 
 onMounted(() => {
   if (viewport.value) {
     isFollowing.value = isViewportAtBottom(viewport.value)
+    if (isFollowing.value) {
+      scrollToBottom()
+    }
   }
 })
 </script>
