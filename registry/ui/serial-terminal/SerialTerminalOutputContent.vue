@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
 import type { TerminalLineEntry } from './useTerminalOutput'
+import { useEventListener, watchImmediate } from '@vueuse/core'
 import { injectScrollAreaRootContext } from 'reka-ui'
 import { computed, onMounted } from 'vue'
-import { useEventListener, watchImmediate } from '@vueuse/core'
 
 export interface ContentProps {
   /**
@@ -30,7 +30,7 @@ function scrollToBottom() {
 // *before* new lines reach the DOM to avoid the race an observer creates.
 const isFollowing = defineModel<boolean>('follow', { default: true })
 
-useEventListener(viewport, ["scroll", "scrollend"], (event) => {
+useEventListener(viewport, ['scroll', 'scrollend'], (event) => {
   if (event.target instanceof Element) {
     isFollowing.value = isViewportAtBottom(event.target)
   }
@@ -42,7 +42,8 @@ function isViewportAtBottom(el: Element): boolean {
 }
 
 const entriesHash = computed(() => {
-  if (!props.entries) return ''
+  if (!props.entries)
+    return ''
   return `${props.entries.length}-${props.entries.at(-1)?.byteLength ?? 0}-${props.entries.at(-1)?.id ?? null}`
 })
 

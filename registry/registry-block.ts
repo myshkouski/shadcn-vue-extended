@@ -30,15 +30,23 @@ export const block = [
     ],
     files: [
       {
-        path: 'blocks/serial-terminal/index.ts',
+        path: 'blocks/serial-terminal-01/index.ts',
         type: 'registry:component',
       },
       {
-        path: 'blocks/serial-terminal/SerialTerminal.vue',
+        path: 'blocks/serial-terminal-01/SerialTerminal.vue',
         type: 'registry:component',
       },
       {
-        path: 'blocks/serial-terminal/SerialTerminalConnectDialog.vue',
+        path: 'blocks/serial-terminal-01/SerialTerminalConnectDialog.vue',
+        type: 'registry:component',
+      },
+      {
+        path: 'blocks/serial-terminal-01/types.ts',
+        type: 'registry:component',
+      },
+      {
+        path: 'blocks/serial-terminal-01/utils.ts',
         type: 'registry:component',
       },
     ],

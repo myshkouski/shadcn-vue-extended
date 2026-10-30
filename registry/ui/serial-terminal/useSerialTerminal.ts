@@ -35,7 +35,7 @@ export interface SerialTerminalTarget {
   writable?: WritableStream<Uint8Array> | null
 }
 
-export type SerialTerminalState = {
+export interface SerialTerminalState {
   readable: boolean
   writable: boolean
 }

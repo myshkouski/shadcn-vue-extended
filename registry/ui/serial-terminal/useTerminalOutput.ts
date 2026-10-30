@@ -1,6 +1,6 @@
 import type { MaybeRef, MaybeRefOrGetter, Ref } from 'vue'
 import type { TerminalDecodedLine, TerminalLineEncoder } from './encoders'
-import { computed, readonly, shallowReactive, shallowRef, toRaw, toValue, unref } from 'vue'
+import { computed, readonly, shallowReactive, shallowRef, toValue, unref } from 'vue'
 import { decodeHex, decodeText, DEFAULT_BINARY_LINE_BYTES } from './encoders'
 
 const DEFAULT_MAX_BYTES = 256 * 1024

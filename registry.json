@@ -229,15 +229,23 @@
       ],
       "files": [
         {
-          "path": "registry/blocks/serial-terminal/index.ts",
+          "path": "registry/blocks/serial-terminal-01/index.ts",
           "type": "registry:component"
         },
         {
-          "path": "registry/blocks/serial-terminal/SerialTerminal.vue",
+          "path": "registry/blocks/serial-terminal-01/SerialTerminal.vue",
           "type": "registry:component"
         },
         {
-          "path": "registry/blocks/serial-terminal/SerialTerminalConnectDialog.vue",
+          "path": "registry/blocks/serial-terminal-01/SerialTerminalConnectDialog.vue",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/blocks/serial-terminal-01/types.ts",
+          "type": "registry:component"
+        },
+        {
+          "path": "registry/blocks/serial-terminal-01/utils.ts",
           "type": "registry:component"
         }
       ]

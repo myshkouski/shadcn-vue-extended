@@ -196,7 +196,7 @@ function formatBaudRate(rate: number) {
               <div
                 v-for="(port, index) in props.ports"
                 :key="port.key"
-                class="flex items-start gap-3 rounded-md border p-3 transition-colors has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/5"
+                class="flex items-start gap-3 rounded-md border p-3 transition-colors has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary/5"
               >
                 <RadioGroupItem
                   :id="`serial-terminal-connect-port-${index}`"

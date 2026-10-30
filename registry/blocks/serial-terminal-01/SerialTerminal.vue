@@ -4,14 +4,13 @@
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { CopyIcon, LinkIcon, TrashIcon, UnlinkIcon, ArrowDownIcon } from '@lucide/vue'
+import { ArrowDownIcon, CopyIcon, LinkIcon, TrashIcon, UnlinkIcon } from '@lucide/vue'
 import { throttledRef, tryOnScopeDispose, useClipboard, watchImmediate } from '@vueuse/core'
 import prettyBytes from 'pretty-bytes'
 import { computed, onMounted, ref, shallowRef, toRaw, watchEffect } from 'vue'
 import { customReactive, useSerial } from 'vue-extras'
 import { toast } from 'vue-sonner'
 import {
-  decodeHex,
   decodeText,
   SerialTerminal,
   SerialTerminalHeader,
@@ -24,6 +23,17 @@ import {
 } from '~~/registry/ui/serial-terminal'
 import SerialTerminalConnectDialog from './SerialTerminalConnectDialog.vue'
 
+const props = defineProps<{
+  devices?: readonly {
+    name: string
+    title: string
+    description: string
+    device?: TerminalTargetDevice
+    encoder?: TerminalLineEncoder
+    disabled?: boolean
+  }[]
+}>()
+
 const serial = useSerial()
 
 const input = shallowRef('')
@@ -34,43 +44,40 @@ const serialPort = ref<SerialPort>()
 // opened: which one, and at which speed.
 const connectDialogOpen = shallowRef(false)
 
-const terminalTargetOption = shallowRef<TerminalTargetOption>('echo')
-
-// How a device's bytes become the text of a line: the terminal talks text, so
-// echo, GPS and a real port render as-is, while the random generator emits bytes
-// that only make sense as fixed length hex rows. Lines are rendered as they are
-// written, so switching the option applies to what comes next and leaves the
-// lines already on screen as they were.
-const encoders: Record<TerminalTargetOption, TerminalLineEncoder> = {
-  'echo': decodeText,
-  'gps-emulator': decodeText,
-  'serial': decodeText,
-  'random-generator': decodeHex,
-}
-
-const encodeLine = computed(() => encoders[terminalTargetOption.value])
-
-// Since terminalTargetOption would be reactive, target should be deeply watched ref to track its props
-const terminalDevice = ref<TerminalTargetDevice | null | undefined>()
-
-/* eslint-disable ts/no-use-before-define -- devices are declared in the trailing <script> block */
-const echoTerminalTarget = new EchoTerminal()
-const randomGenerator = new RandomGenerator()
-const gpsEmulator = new GPSEmulator()
+const terminalTargetOption = shallowRef<string>(props.devices?.[0]?.name ?? 'serial')
 
 const textEncoder = new TextEncoder()
 
-function resolveTerminalTarget(option: TerminalTargetOption): TerminalTargetDevice | null | undefined {
-  switch (option) {
-    case 'serial':
-      return serialPort.value
-    case 'echo':
-      return toReactiveDevice(echoTerminalTarget)
-    case 'gps-emulator':
-      return toReactiveDevice(gpsEmulator)
-    case 'random-generator':
-      return toReactiveDevice(randomGenerator)
-  }
+const encoders = computed<Record<string, TerminalLineEncoder>>(() => {
+  const map: Record<string, TerminalLineEncoder> = { serial: decodeText }
+  for (const d of props.devices ?? [])
+    map[d.name] = d.encoder ?? decodeText
+  return map
+})
+
+const encodeLine = computed(() => encoders.value[terminalTargetOption.value] ?? decodeText)
+
+const terminalDevice = ref<TerminalTargetDevice | null | undefined>()
+
+const reactiveDevices = new WeakMap<TerminalTargetDevice, TerminalTargetDevice>()
+
+function toReactiveDevice(device: TerminalTargetDevice) {
+  const cached = reactiveDevices.get(device)
+  if (cached)
+    return cached
+  const proxy = customReactive(device, {
+    track: ['readable', 'writable'],
+    actions: { open: ['readable', 'writable'], close: ['readable', 'writable'] },
+  })
+  reactiveDevices.set(device, proxy)
+  return proxy
+}
+
+function resolveTerminalTarget(option: string): TerminalTargetDevice | null | undefined {
+  if (option === 'serial')
+    return serialPort.value
+  const d = (props.devices ?? []).find(x => x.name === option)
+  return d?.device ? toReactiveDevice(d.device) : undefined
 }
 
 watchEffect(() => {
@@ -182,7 +189,7 @@ async function connect() {
     if (!device)
       return
 
-    if (device instanceof VirtualDevice)
+    if (typeof device?.open === 'function')
       await device.open()
 
     debug('connect', describeDevice(device))
@@ -304,6 +311,11 @@ function copyOutput() {
   }
 }
 
+function clearOutputAndTruncatedBytesCounter() {
+  clearOutput()
+  truncatedBytes.value = 0
+}
+
 const buttons = computed(() => {
   debug('computed(buttons)', {
     terminalTargetOption: terminalTargetOption.value,
@@ -314,33 +326,19 @@ const buttons = computed(() => {
 
   return [
     { label: 'Copy', icon: CopyIcon, action: copyOutput, disabled: !isCopySupported.value },
-    { label: 'Clear', icon: TrashIcon, action: clearOutput },
+    { label: 'Clear', icon: TrashIcon, action: clearOutputAndTruncatedBytesCounter },
   ]
 })
 
-const targetOptions: readonly TargetOptions[] = [
-  {
-    name: 'echo',
-    title: 'Echo terminal',
-    description: 'Use virtual emulated device for echoing terminal input.',
-  },
-  {
-    name: 'random-generator',
-    title: 'Random bytes generator',
-    description: 'Generates infinite random bytes, rendered as fixed length hex rows.',
-    // disabled: true,
-  },
-  {
-    name: 'gps-emulator',
-    title: 'Virtual GPS module emulator',
-    description: 'Emulates output of <a class="underline" href="https://content.u-blox.com/sites/default/files/products/documents/NEO-7_DataSheet_%28UBX-13003830%29.pdf" target="_blank">u-blox NEO-7 series</a> GPS module.',
-  },
-  {
-    name: 'serial',
-    title: 'Serial port',
-    description: 'Connect to a real serial port device using <a class="underline" target="_blank" href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Serial_API">WebSerial API</a>.',
-  },
-]
+const targetOptions = computed<TargetOptions[]>(() => {
+  const options: TargetOptions[] = (props.devices ?? []).map(d => ({
+    name: d.name,
+    title: d.title,
+    description: d.description,
+    disabled: d.disabled,
+  }))
+  return options
+})
 
 function hasEntries() {
   // The line being written to is the last entry: without it the
@@ -351,10 +349,11 @@ function hasEntries() {
 
 const terminalStateText = computed(() => {
   return Object.entries({
-    'r': serialTerminalState.value.readable,
-    'w': serialTerminalState.value.writable,
+    r: serialTerminalState.value.readable,
+    w: serialTerminalState.value.writable,
   }).reduce((text, [char, enabled]) => {
-    if (enabled) text += char
+    if (enabled)
+      text += char
     return text
   }, '')
 })
@@ -467,20 +466,20 @@ const isFollowingOutput = shallowRef(true)
 
             <SerialTerminalOutputContent
               v-slot="{ entry }"
-              :entries
               v-model:follow="isFollowingOutput"
+              :entries
             >
               <SerialTerminalOutputLine :entry />
             </SerialTerminalOutputContent>
           </SerialTerminalOutput>
 
-          <Button 
+          <Button
             v-show="!isFollowingOutput"
-            @click="isFollowingOutput = true"
-            class="absolute bottom-4 right-4" 
+            class="absolute bottom-4 right-4"
             variant="outline"
-            size="icon" 
+            size="icon"
             aria-label="Follow output"
+            @click="isFollowingOutput = true"
           >
             <ArrowDownIcon />
           </Button>
@@ -508,10 +507,10 @@ const isFollowingOutput = shallowRef(true)
 <!-- eslint-disable vue/block-order -->
 <script lang="ts">
 /* eslint-disable import/first -- imports are hoisted per block, the mocks only need the shared module scope */
-import type { SerialTerminalTarget, TerminalLineEncoder } from '~~/registry/ui/serial-terminal'
+import type { TerminalLineEncoder } from '~~/registry/ui/serial-terminal'
 import type { SerialTerminalConnectPayload, SerialTerminalPortOption, SerialTerminalRequestPortPayload } from './SerialTerminalConnectDialog.vue'
-import { getRandomValues } from 'uncrypto'
-import { bigint } from 'zod'
+import type { TerminalTargetDevice } from './types.ts'
+import { describeDevice, describePort } from './utils.ts'
 
 // --- debug ------------------------------------------------------------------
 
@@ -522,277 +521,14 @@ const debug = (...args: unknown[]) => console.debug('[serial-terminal]', ...args
 
 // --- types ------------------------------------------------------------------
 
-type TerminalTargetOption =
-  | 'echo'
-  | 'random-generator'
-  | 'gps-emulator'
-  | 'serial'
-
 interface TargetOptions {
-  name: TerminalTargetOption
+  name: string
   title: string
   description: string
   disabled?: boolean
 }
 
-interface TerminalTargetDevice extends SerialTerminalTarget {
-  open: (...args: any[]) => Promise<void> | void
-  close: () => Promise<void> | void
-}
-
-// --- utils ------------------------------------------------------------------
-
-// `customReactive` tracks `readable`/`writable`, so reading them through its
-// proxy inside a watcher subscribes that watcher to the device. Inspecting a
-// device must not do that: `close()` triggers exactly these props, which would
-// re-enter the watcher with a stale `oldTarget`. `toRaw` unwraps the proxy
-// (its `get` handler answers `ReactiveFlags.RAW`) and makes the read inert.
-// `customReactive` tracks `readable`/`writable`, so reading them through its
-// proxy inside a watcher subscribes that watcher to the device. Inspecting a
-// device must not do that: `close()` triggers exactly these props, which would
-// re-enter the watcher with a stale `oldTarget`. `toRaw` unwraps the proxy
-// (its `get` handler answers `ReactiveFlags.RAW`) and makes the read inert.
-// `customReactive` tracks `readable`/`writable`, so reading them through its
-// proxy inside a watcher subscribes that watcher to the device. Inspecting a
-// device must not do that: `close()` triggers exactly these props, which would
-// re-enter the watcher with a stale `oldTarget` and cancel the stream the reader
-// has just locked. `toRaw` unwraps the proxy (its `get` handler answers
-// `ReactiveFlags.RAW`) and makes the read inert.
-function untrackDevice(device: TerminalTargetDevice): TerminalTargetDevice {
-  return toRaw(device)
-}
-
 function isDeviceOpen(device: TerminalTargetDevice) {
-  const raw = untrackDevice(device)
-  return raw.readable || raw.writable
-}
-
-function describeStream(stream: ReadableStream<Uint8Array> | WritableStream<Uint8Array> | null | undefined): string {
-  if (!stream)
-    return 'none'
-  return stream.locked ? 'locked' : 'unlocked'
-}
-
-function readPortInfo(port: SerialPort): SerialPortInfo {
-  // Only exposed to a granted port, so a device can refuse it.
-  try {
-    return port.getInfo()
-  }
-  catch {
-    return {}
-  }
-}
-
-function describePort(port: SerialPort, index: number): SerialTerminalPortOption {
-  const { usbVendorId, usbProductId } = readPortInfo(port)
-  const ids = [usbVendorId, usbProductId]
-    .filter((id): id is number => typeof id === 'number')
-    .map(id => id.toString(16).padStart(4, '0'))
-  const isOpen = !!port.readable || !!port.writable
-
-  return {
-    // `SerialPort` carries no id of its own, and its USB ids collide between two
-    // identical devices. The position in the list is the one handle that stays
-    // unique, and it is exactly what `handleConnect` resolves against.
-    key: String(index),
-    label: ids.length ? `USB ${ids.join(':')}` : `Serial port ${index + 1}`,
-    description: isOpen ? 'Already open' : 'Available',
-    open: isOpen,
-  }
-}
-
-function describeDevice(device: TerminalTargetDevice | null | undefined): string {
-  if (!device)
-    return String(device)
-  const raw = untrackDevice(device)
-  return `${Object.getPrototypeOf(raw).constructor.name} { readable: ${describeStream(raw.readable)}, writable: ${describeStream(raw.writable)} }`
-}
-
-async function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve()
-    }, ms)
-  })
-}
-
-// Same device instance must keep yielding the same proxy: `resolveTerminalTarget`
-// runs on every `watchEffect` pass, and a fresh proxy per call would look like a
-// different target to the reader, which would then `getReader()` an already
-// locked stream.
-const reactiveDevices = new WeakMap<TerminalTargetDevice, TerminalTargetDevice>()
-
-function toReactiveDevice(device: TerminalTargetDevice) {
-  const cached = reactiveDevices.get(device)
-
-  if (cached)
-    return cached
-
-  const proxy = customReactive(device, {
-    track: ['readable', 'writable'],
-    actions: {
-      open: ['readable', 'writable'],
-      close: ['readable', 'writable'],
-    },
-  })
-
-  reactiveDevices.set(device, proxy)
-
-  return proxy
-}
-
-// --- byte stream source -----------------------------------------------------
-
-class DefaultUnderlyingByteSource implements UnderlyingByteSource {
-  readonly type = 'bytes'
-
-  private cancelled = false
-
-  constructor(
-    private readonly read: (chunkSize: number) => PromiseLike<ArrayBufferView<ArrayBuffer>> | ArrayBufferView<ArrayBuffer>,
-  ) {}
-
-  async pull(controller: ReadableByteStreamController): Promise<void> {
-    if (this.cancelled) {
-      return
-    }
-
-    // `pull` gets scheduled again on every microtask while a read is pending,
-    // even once the queue is full, so returning without enqueueing would spin
-    // the microtask queue forever. Always hand over at least one byte and let
-    // `desiredSize` size the chunk, not gate it.
-    const chunkSize = Math.max(1, controller.desiredSize ?? 0)
-    const buffer = await this.read(chunkSize)
-
-    // Cancelling closes the stream, and `enqueue` on a closed stream throws.
-    if (this.cancelled) {
-      return
-    }
-
-    controller.enqueue(buffer)
-  }
-
-  cancel() {
-    this.cancelled = true
-  }
-}
-
-// --- virtual devices --------------------------------------------------------
-
-abstract class VirtualDevice implements TerminalTargetDevice {
-  protected _readable: ReadableStream<Uint8Array> | null = null
-  protected _writable: WritableStream<Uint8Array> | null = null
-
-  get readable() {
-    return this._readable
-  }
-
-  get writable() {
-    return this._writable
-  }
-
-  protected abstract _open(...args: any[]): Promise<void> | void
-
-  async open(...args: any[]) {
-    if (this.readable || this.writable)
-      return
-    debug('VirtualDevice#open', 'before open', this)
-    await this._open(...args)
-    debug('VirtualDevice#open', 'opened', this)
-  }
-
-  async close(): Promise<void> {
-    debug('VirtualDevice#close', 'before close', this)
-
-    const readable = this._readable
-    const writable = this._writable
-
-    // Cleared up front so `close()` is idempotent and `open()` can build a
-    // fresh pair of streams.
-    this._readable = null
-    this._writable = null
-
-    // A locked stream rejects `cancel()`/`close()` outright. Releasing a lock
-    // belongs to whoever holds it, and that consumer may not have detached yet,
-    // so skip the teardown instead of failing on it.
-    if (readable?.locked)
-      debug('VirtualDevice#close', 'skipped locked readable')
-    if (writable?.locked)
-      debug('VirtualDevice#close', 'skipped locked writable')
-
-    await Promise.allSettled([
-      readable && !readable.locked ? readable.cancel() : undefined,
-      writable && !writable.locked ? writable.close() : undefined,
-    ])
-
-    debug('VirtualDevice#close', 'closed', this)
-  }
-}
-
-class EchoTerminal extends VirtualDevice {
-  private controller: ReadableStreamDefaultController<Uint8Array> | null = null
-
-  _open() {
-    this._readable = new ReadableStream({
-      start: (controller) => {
-        this.controller = controller
-      },
-      cancel: () => {
-        this.controller = null
-      },
-    })
-
-    this._writable = new WritableStream(
-      {
-        write: (chunk) => {
-          this.controller?.enqueue(new Uint8Array(chunk.buffer))
-        },
-      },
-      {
-        highWaterMark: 512,
-      }
-    )
-  }
-}
-
-class RandomGenerator extends VirtualDevice {
-  _open() {
-    const byteSource = new DefaultUnderlyingByteSource(async (size) => {
-      return getRandomValues(new Uint8Array(size))
-    })
-    this._readable = new ReadableStream(
-      byteSource,
-      {
-        highWaterMark: 1024,
-      }
-    )
-  }
-}
-
-class GPSEmulator extends VirtualDevice {
-  _open() {
-    const textEncoder = new TextEncoder()
-    const byteSource = new DefaultUnderlyingByteSource(async (_size) => {
-      await delay(1_000)
-
-      const output = [
-        '$GPRMC,,V,,,,,,,,,,N*53',
-        '$GPVTG,,,,,,,,,N*30',
-        '$GPGGA,,,,,,0,00,99.99,,,,,,*48',
-        '$GPGSA,A,1,,,,,,,,,,,,,99.99,99.99,99.99*30',
-        '$GPGLL,,,,,,V,N*64',
-        '',
-      ].join('\r\n')
-
-      return textEncoder.encode(output)
-    })
-
-    this._readable = new ReadableStream(
-      byteSource, 
-      {
-        highWaterMark: 512,
-      }
-    )
-  }
+  return device.readable || device.writable
 }
 </script>

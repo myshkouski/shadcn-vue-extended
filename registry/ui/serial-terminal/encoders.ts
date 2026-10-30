@@ -285,7 +285,6 @@ export class LineDecoder extends HexDecoderStream {}
 
 export class BinaryLineDecoder extends HexDecoderStream {}
 
-
 export const createBinaryDecoder = (opts?: any) => new HexDecoderStream(opts)
 
 export const createTextLineDecoder = (opts?: any) => new TextLineDecoderStream(opts)
