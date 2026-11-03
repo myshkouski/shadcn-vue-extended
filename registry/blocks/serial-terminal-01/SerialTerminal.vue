@@ -20,7 +20,7 @@ import {
   SerialTerminalOutputLine,
   useSerialTerminal,
   useTerminalOutput,
-} from '~~/registry/ui/serial-terminal'
+} from '@/components/ui/serial-terminal'
 import SerialTerminalConnectDialog from './SerialTerminalConnectDialog.vue'
 
 const props = defineProps<{
@@ -507,7 +507,7 @@ const isFollowingOutput = shallowRef(true)
 <!-- eslint-disable vue/block-order -->
 <script lang="ts">
 /* eslint-disable import/first -- imports are hoisted per block, the mocks only need the shared module scope */
-import type { TerminalLineEncoder } from '~~/registry/ui/serial-terminal'
+import type { TerminalLineEncoder } from '@/components/ui/serial-terminal'
 import type { SerialTerminalConnectPayload, SerialTerminalPortOption, SerialTerminalRequestPortPayload } from './SerialTerminalConnectDialog.vue'
 import type { TerminalTargetDevice } from './types.ts'
 import { describeDevice, describePort } from './utils.ts'

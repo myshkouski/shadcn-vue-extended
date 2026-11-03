@@ -1,5 +1,6 @@
 import tailwindcss from '@tailwindcss/vite'
 import transformBeforeParse from './transformers'
+import { fileURLToPath } from 'node:url'
 
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
@@ -90,6 +91,9 @@ export default defineNuxtConfig({
   },
   colorMode: {
     classSuffix: '',
+  },
+  alias: {
+    '@/components/ui/serial-terminal': fileURLToPath(new URL('./registry/ui/serial-terminal', import.meta.url)),
   },
   hooks: {
     'content:file:beforeParse': (ctx) => {

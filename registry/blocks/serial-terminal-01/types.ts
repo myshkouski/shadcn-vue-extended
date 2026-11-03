@@ -1,4 +1,4 @@
-import type { SerialTerminalTarget } from '~~/registry/ui/serial-terminal'
+import type { SerialTerminalTarget } from '@/components/ui/serial-terminal'
 
 export interface TerminalTargetDevice extends SerialTerminalTarget {
   open: (...args: any[]) => Promise<void> | void

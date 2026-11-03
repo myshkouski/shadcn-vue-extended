@@ -5,7 +5,7 @@ import SerialTerminalBlock from '~~/registry/blocks/serial-terminal-01'
 </script>
 
 <script setup lang="ts">
-import { decodeHex, decodeText } from '~~/registry/ui/serial-terminal'
+import { decodeHex, decodeText } from '@/components/ui/serial-terminal'
 
 abstract class VirtualDevice implements TerminalTargetDevice {
   protected _readable: ReadableStream<Uint8Array> | null = null
