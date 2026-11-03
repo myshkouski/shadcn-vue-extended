@@ -1,5 +1,5 @@
-import type { SerialTerminalPortOption } from "./SerialTerminalConnectDialog.vue"
-import type { TerminalTargetDevice } from "./types"
+import type { SerialTerminalPortOption } from './SerialTerminalConnectDialog.vue'
+import type { TerminalTargetDevice } from './types'
 
 export function describePort(port: SerialPort, index: number): SerialTerminalPortOption {
   const { usbVendorId, usbProductId } = readPortInfo(port)

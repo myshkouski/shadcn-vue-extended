@@ -2,7 +2,6 @@
 import type { TerminalTargetDevice } from '~~/registry/blocks/serial-terminal-01'
 import { getRandomValues } from 'uncrypto'
 import SerialTerminalBlock from '~~/registry/blocks/serial-terminal-01'
-
 </script>
 
 <script setup lang="ts">
