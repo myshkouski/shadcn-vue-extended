@@ -20,7 +20,8 @@ export const block = [
       'vue-sonner',
     ],
     registryDependencies: [
-      './serial-terminal.json',
+      // TODO: replace with shadcn-vue-extended registry URL
+      'myshkouski/shadcn-vue-extended/serial-terminal#feat/serial-terminal',
       'button',
       'card',
       'dialog',
