@@ -20,7 +20,7 @@ export const block = [
       'vue-sonner',
     ],
     registryDependencies: [
-      'serial-terminal',
+      './serial-terminal.json',
       'button',
       'card',
       'dialog',
