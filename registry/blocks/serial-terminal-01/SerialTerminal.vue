@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { ArrowDownIcon, CopyIcon, LinkIcon, TrashIcon, UnlinkIcon } from '@lucide/vue'
 import { throttledRef, tryOnScopeDispose, useClipboard, watchImmediate } from '@vueuse/core'
 import prettyBytes from 'pretty-bytes'
-import { computed, onMounted, ref, shallowRef, watchEffect } from 'vue'
+import { computed, onMounted, ref, shallowRef, toValue, watchEffect } from 'vue'
 import { customReactive, useSerial } from 'vue-extras'
 import { toast } from 'vue-sonner'
 import {
